@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>錦輝塑膠 - 行動盤點系統 v2.0</title>
+    <!-- 引入 Tailwind CSS 與 Google Material Icons 圖標 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body { 
+            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* 優化手機端滾動與輸入 */
+        input[type="number"] { font-size: 16px !important; }
+        .blur-bg { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 pb-16">
+
+    <!-- 頂部高質感導覽列 (毛玻璃效果) -->
+    <header class="bg-white/80 blur-bg border-b border-slate-200/80 sticky top-0 z-50 transition-all shadow-sm">
+        <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md shadow-blue-200">
+                    錦
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-slate-900 tracking-wide">錦輝塑膠業</h1>
+                    <p class="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Inventory Cloud</p>
+                </div>
+            </div>
+            <!-- 重新整理按鈕 -->
+            <button onclick="loadData()" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-95 transition-all">
+                <span class="material-icons text-xl">refresh</span>
+            </button>
+        </div>
+        
+        <!-- 全域連線狀態條 -->
+        <div id="status-bar" class="bg-amber-50 border-t border-amber-100 text-[11px] text-amber-700 py-1 px-4 text-center font-medium flex items-center justify-center gap-1.5 transition-all">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+            <span id="status-text">正在初始化雲端連線...</span>
+        </div>
+    </header>
+
+    <!-- 主內容區 -->
+    <main class="max-w-md mx-auto px-4 mt-4">
+        
+        <!-- ================= 待檢查區域 ================= -->
+        <section class="mb-6">
+            <div class="flex items-center justify-between mb-2 px-1">
+                <div class="flex items-center gap-1.5">
+                    <span class="material-icons text-red-500 text-lg">pending_actions</span>
+                    <h2 class="text-sm font-bold text-slate-700">待檢查商品 <span class="text-xs font-normal text-slate-400">(G欄空白)</span></h2>
+                </div>
+                <span id="unverified-count" class="bg-red-50 text-red-600 border border-red-100 text-xs px-2.5 py-0.5 rounded-full font-bold">0</span>
+            </div>
+            <div id="unverified-list" class="space-y-3">
+                <!-- 骨架屏載入動畫 -->
+                <div class="bg-white rounded-xl p-3 border border-slate-100 animate-pulse flex gap-3">
+                    <div class="w-14 h-14 bg-slate-100 rounded-lg"></div>
+                    <div class="flex-grow space-y-2 py-1">
+                        <div class="h-4 bg-slate-100 rounded w-1/3"></div>
+                        <div class="h-3 bg-slate-100 rounded w-2/3"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 已檢查區域 ================= -->
+        <section>
+            <div class="flex items-center justify-between mb-2 px-1">
+                <div class="flex items-center gap-1.5">
+                    <span class="material-icons text-emerald-500 text-lg">task_alt</span>
+                    <h2 class="text-sm font-bold text-slate-700">已檢查商品 <span class="text-xs font-normal text-slate-400">(G欄有值)</span></h2>
+                </div>
+                <span id="verified-count" class="bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs px-2.5 py-0.5 rounded-full font-bold">0</span>
+            </div>
+            <div id="verified-list" class="space-y-3 opacity-80">
+                <!-- 動態載入 -->
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // 已自動綁定您最新的 GAS 網頁應用程式網址
+        const API_URL = "https://script.google.com/macros/s/AKfycbw39xPwtYMRvOFI4lGgU0gaDuCHyzC4AfwTOqVkabNw_Z-0EVtRfYpndZ-ra7Tjv9iw/exec";
+
+        let inventoryData = [];
+
+        // 載入資料
+        function loadData() {
+            updateStatus("connecting", "正在同步 Google 試算表最新庫存...");
+            fetch(API_URL)
+                .then(res => res.json())
+                .then(data => {
+                    if(data.error) {
+                        updateStatus("error", "試算表錯誤: " + data.error);
+                        return;
+                    }
+                    inventoryData = data;
+                    renderInventory();
+                    updateStatus("success", "已成功同步雲端 Inventory 資料");
+                })
+                .catch(err => {
+                    updateStatus("error", "連線失敗，請檢查手機網路");
+                    console.error(err);
+                });
+        }
+
+        // 畫面渲染
+        function renderInventory() {
+            const unverifiedList = document.getElementById('unverified-list');
+            const verifiedList = document.getElementById('verified-list');
+            unverifiedList.innerHTML = '';
+            verifiedList.innerHTML = '';
+
+            let unverifiedCount = 0;
+            let verifiedCount = 0;
+
+            inventoryData.forEach(item => {
+                const isVerified = item.realStock !== null;
+                const isCorrect = isVerified && item.realStock === item.remaining;
+                
+                const card = document.createElement('div');
+                card.className = `bg-white rounded-xl p-3 border shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex items-center gap-3 transition-all duration-300 ${
+                    isVerified 
+                    ? 'border-emerald-100 bg-emerald-50/20' 
+                    : 'border-slate-200/60 bg-white hover:border-slate-300'
+                }`;
+                
+                card.innerHTML = `
+                    <!-- 左側小 ICON 視覺優化 -->
+                    <div class="w-12 h-12 rounded-lg flex flex-col items-center justify-center flex-shrink-0 border transition-colors ${
+                        isVerified 
+                        ? 'bg-emerald-50 border-emerald-100 text-emerald-500' 
+                        : 'bg-blue-50/60 border-blue-100 text-blue-500'
+                    }">
+                        <span class="material-icons text-xl">${isVerified ? 'inventory' : 'inventory_2'}</span>
+                    </div>
+                    
+                    <!-- 中間資訊 -->
+                    <div class="flex-grow min-w-0">
+                        <div class="font-bold text-slate-900 text-[14px] tracking-wide truncate mb-0.5">${item.model}</div>
+                        <div class="text-[11px] text-slate-400 truncate mb-1.5">${item.name || '無品名描述'}</div>
+                        <div class="text-xs text-slate-500 flex items-center gap-1">
+                            <span>系統剩餘 (F):</span>
+                            <span class="font-bold text-slate-800 text-sm">${item.remaining}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 右側操作區 -->
+                    <div class="flex flex-col items-end gap-2 flex-shrink-0">
+                        <!-- 快速打勾按鈕 -->
+                        <button onclick="quickCheck(${item.row}, ${item.remaining}, ${isCorrect})" 
+                                class="text-[11px] px-2.5 py-1 rounded-md font-medium border flex items-center gap-0.5 transition-all active:scale-95 ${
+                                    isCorrect 
+                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-100' 
+                                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                }">
+                            <span class="material-icons text-xs">${isCorrect ? 'check_circle' : 'done'}</span>
+                            <span>${isCorrect ? '正確' : '相符'}</span>
+                        </button>
+                        
+                        <!-- 手動輸入 -->
+                        <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-md p-0.5 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
+                            <span class="text-[10px] text-slate-400 pl-1 font-bold">真:</span>
+                            <input type="number" 
+                                   value="${item.realStock !== null ? item.realStock : ''}" 
+                                   placeholder="未檢" 
+                                   onchange="uploadStock(${item.row}, this.value)"
+                                   class="w-12 text-center bg-transparent p-0.5 text-xs font-bold text-slate-800 focus:outline-none">
+                        </div>
+                    </div>
+                `;
+
+                if (isVerified) {
+                    verifiedList.appendChild(card);
+                    verifiedCount++;
+                } else {
+                    unverifiedList.appendChild(card);
+                    unverifiedCount++;
+                }
+            });
+
+            document.getElementById('unverified-count').innerText = unverifiedCount;
+            document.getElementById('verified-count').innerText = verifiedCount;
+
+            // 當全部核對完畢的精美提示
+            if (unverifiedCount === 0 && inventoryData.length > 0) {
+                unverifiedList.innerHTML = `
+                    <div class="text-center py-8 bg-emerald-50/40 rounded-xl border border-dashed border-emerald-200 p-4">
+                        <span class="material-icons text-emerald-500 text-3xl mb-1">celebration</span>
+                        <div class="text-xs font-bold text-emerald-800">盤點任務達成！</div>
+                        <div class="text-[11px] text-emerald-600/80 mt-0.5">所有商品皆已核對完畢</div>
+                    </div>
+                `;
+            }
+        }
+
+        // 後端資料上傳與即時更新
+        function uploadStock(row, value) {
+            updateStatus("uploading", "正在寫入雲端試算表 G 欄...");
+            const realStock = value === '' ? null : parseInt(value, 10);
+
+            fetch(API_URL, {
+                method: "POST",
+                body: JSON.stringify({ row: row, realStock: realStock })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if(res.status === "success") {
+                    const item = inventoryData.find(i => i.row === row);
+                    if(item) item.realStock = realStock;
+                    renderInventory();
+                    updateStatus("success", "數據已成功儲存至試算表！");
+                } else {
+                    updateStatus("error", "儲存失敗: " + res.message);
+                }
+            })
+            .catch(err => {
+                updateStatus("error", "回傳超時，請重新輸入");
+                console.error(err);
+            });
+        }
+
+        // 快速打勾
+        function quickCheck(row, val, alreadyCorrect) {
+            const newValue = alreadyCorrect ? '' : val;
+            uploadStock(row, newValue);
+        }
+
+        // 精緻狀態欄切換
+        function updateStatus(type, text) {
+            const bar = document.getElementById('status-bar');
+            const txt = document.getElementById('status-text');
+            
+            // 清除舊顏色
+            bar.className = "text-[11px] py-1 px-4 text-center font-medium flex items-center justify-center gap-1.5 transition-all border-t ";
+            
+            if (type === "connecting" || type === "uploading") {
+                bar.classList.add("bg-amber-50", "border-amber-100", "text-amber-700");
+                bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span><span>${text}</span>`;
+            } else if (type === "success") {
+                bar.classList.add("bg-emerald-50", "border-emerald-100", "text-emerald-700");
+                bar.innerHTML = `<span class="material-icons text-xs text-emerald-500">check_circle</span><span>${text}</span>`;
+                // 3秒後恢復靜態成功提示，避免畫面一直閃爍
+                setTimeout(() => {
+                    bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>系統就緒 · 連線正常</span>`;
+                }, 3000);
+            } else if (type === "error") {
+                bar.classList.add("bg-rose-50", "border-rose-100", "text-rose-700");
+                bar.innerHTML = `<span class="material-icons text-xs text-rose-500">error</span><span class="font-bold">${text}</span>`;
+            }
+        }
+
+        // 初始化
+        loadData();
+    </script>
+</body>
+</html>
