@@ -4,102 +4,119 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>錦輝塑膠業有限公司官網 JIN HUEI PLASTIC</title>
-    <!-- 引入 Tailwind CSS 進行快速排版 -->
+    <!-- 引入 Tailwind CSS 實現精美排版 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 flex flex-col min-h-screen">
 
+    <!-- 導覽列 -->
     <header class="bg-white border-b shadow-sm sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
-            <div id="logo-container">
-                <div class="text-xl font-bold text-blue-600">錦輝塑膠業 JIN HUEI</div>
+            <div class="text-xl font-bold text-blue-600 tracking-wide">
+                錦輝塑膠業 JIN HUEI
             </div>
-            
-            <div class="flex items-center gap-6">
-                <div id="store-container" class="flex gap-4 items-center"></div>
-                <div class="h-6 w-px bg-gray-300"></div>
-                <button id="lang-toggle-btn" class="text-sm font-medium text-gray-600 hover:text-blue-600">切換語言</button>
-            </div>
+            <button id="lang-toggle-btn" class="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors">
+                繁體中文 / EN
+            </button>
         </div>
     </header>
 
-    <!-- 商品呈現主區塊 -->
-    <main class="container mx-auto px-4 py-10">
-        <h1 class="text-2xl font-bold mb-6 text-gray-800">商品庫存一覽表</h1>
+    <!-- 主內容區 -->
+    <main class="container mx-auto px-4 py-10 flex-1">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800 border-l-4 border-blue-600 pl-3">商品庫存一覽表</h1>
         
-        <!-- 載入中的動畫提示 -->
-        <div id="loading" class="text-center py-10 text-gray-500 animate-pulse text-lg">
-            📦 正在從雲端同步最新庫存與圖片...
+        <!-- 狀態提示區 -->
+        <div id="loading" class="text-center py-12 text-gray-500 text-lg">
+            <div class="animate-pulse mb-2">📦 正在從雲端安全同步最新商品與圖片...</div>
+            <div class="text-xs text-gray-400">正在連線至錦輝內部資料庫</div>
         </div>
 
-        <!-- 圖片與商品卡片容器 -->
-        <div id="app" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        <!-- 商品展示網格 -->
+        <div id="app" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
     </main>
 
-    <!-- 💡 將原本的 script.js 邏輯直接整合在這裡 -->
+    <!-- 頁尾 -->
+    <footer class="bg-white border-t py-4 mt-10">
+        <div class="container mx-auto px-4 text-center text-xs text-gray-400">
+            &copy; 2026 錦輝塑膠業有限公司. All Rights Reserved.
+        </div>
+    </footer>
+
     <script>
-        // ⚠️ 請將下方網址替換為您 Google Apps Script「部署」後產生的網頁應用程式 URL
+        // 🔒 已自動為您記住並填入最新的官方 API 部署網址
         const API_URL = "https://script.google.com/macros/s/AKfycbw39xPwtYMRvOFI4lGgU0gaDuCHyzC4AfwTOqVkabNw_Z-0EVtRfYpndZ-ra7Tjv9iw/exec"; 
 
-        // 頁面載入時自動執行抓取資料
+        // 網頁開啟時立即載入
         window.addEventListener('DOMContentLoaded', () => {
             fetchInventory();
         });
 
-        // 從 GAS 讀取資料並渲染到網頁上
+        // 向 GAS 請求資料
         function fetchInventory() {
-            fetch(API_URL)
-                .then(response => response.json())
+            // 加上時間戳記，徹底防止瀏覽器快取舊資料
+            const targetUrl = `${API_URL}?_=${new Date().getTime()}`;
+
+            fetch(targetUrl, { method: "GET" })
+                .then(response => {
+                    if (!response.ok) throw new Error('API 響應錯誤');
+                    return response.json();
+                })
                 .then(data => {
-                    // 隱藏載入中提示
+                    // 成功取得資料，隱藏載入提示
                     document.getElementById('loading').style.display = 'none';
-                    
-                    // 渲染商品卡片
                     renderCards(data);
                 })
                 .catch(error => {
-                    console.error("讀取資料失敗:", error);
-                    document.getElementById('loading').innerText = "❌ 無法載入資料，請確認 API 網址是否正確或已公開發布。";
+                    console.error("資料載入失敗:", error);
+                    document.getElementById('loading').innerHTML = `
+                        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-6 rounded-xl max-w-md mx-auto shadow-sm">
+                            <div class="font-bold text-lg mb-1">❌ 雲端連線失敗</div>
+                            <p class="text-sm text-red-600 mb-3">無法順利讀取資料，這通常是因為 GAS 沒有發布更新。</p>
+                            <div class="text-xs text-left bg-white p-3 rounded border text-gray-500 font-mono overflow-x-auto">
+                                💡 解決辦法：請在 Apps Script 畫面右上方點擊「部署」->「管理部署」-> 點擊鉛筆 -> 版本選「新版本」-> 點擊「部署」即可啟用。
+                            </div>
+                        </div>`;
                 });
         }
 
-        // 動態建立 HTML 結構（含圖片標籤）
+        // 渲染商品圖文卡片
         function renderCards(items) {
             const container = document.getElementById('app');
             
             if (!items || items.length === 0) {
-                container.innerHTML = `<div class="text-gray-500 col-span-full text-center">目前無任何商品資料</div>`;
+                container.innerHTML = `<div class="text-gray-400 col-span-full text-center py-10">📭 目前 Inventory 表格內無有效資料</div>`;
                 return;
             }
 
             container.innerHTML = items.map(item => {
-                // 💡 檢查是否有圖片網址，若無則顯示預設的預留圖
+                // 💡 判斷是否有圖片網址且格式正確，若無則投射一張高質感的預設 No Image 圖
                 const displayImg = item.imgUrl && item.imgUrl.startsWith('http') 
                     ? item.imgUrl 
-                    : "https://placehold.co/300x300/e2e8f0/64748b?text=No+Image";
+                    : "https://placehold.co/400x300/f1f5f9/94a3b8?text=No+Image";
 
                 return `
-                    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
-                        <!-- 商品圖片區塊 -->
-                        <div class="w-full h-48 bg-gray-100 flex items-center justify-center overflow-hidden border-b">
-                            <img src="${displayImg}" class="w-full h-full object-cover" alt="${item.name}" onerror="this.src='https://placehold.co/300x300/fee2e2/ef4444?text=Image+Error'">
+                    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+                        <!-- 圖片展示區 -->
+                        <div class="w-full h-48 bg-gray-50 flex items-center justify-center overflow-hidden border-b border-gray-100">
+                            <img src="${displayImg}" 
+                                 class="w-full h-full object-cover" 
+                                 alt="${item.name}" 
+                                 onerror="this.src='https://placehold.co/400x300/fef2f2/ef4444?text=Image+Error'">
                         </div>
                         
-                        <!-- 商品文字內容區塊 -->
-                        <div class="p-5 flex-1 flex flex-col justify-between">
+                        <!-- 規格與品名區 -->
+                        <div class="p-4 flex-1 flex flex-col justify-between">
                             <div>
-                                <span class="inline-block text-xs font-semibold tracking-wider uppercase px-2 py-1 rounded bg-blue-50 text-blue-600 mb-2">
+                                <span class="inline-block text-[11px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-600 mb-2">
                                     ${item.model}
                                 </span>
-                                <h2 class="text-lg font-bold text-gray-800 mb-1">${item.name}</h2>
+                                <h2 class="text-base font-bold text-gray-800 line-clamp-2 mb-1">${item.name}</h2>
                             </div>
                             
+                            <!-- 庫存數據 -->
                             <div class="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center text-sm">
-                                <span class="text-gray-500">系統剩餘：</span>
-                                <span class="font-bold ${item.remaining <= 10 ? 'text-red-500 font-extrabold' : 'text-gray-700'}">
-                                    ${item.remaining} 件
-                                </span>
+                                <span class="text-gray-400">現有庫存：</span>
+                                <span class="font-bold text-gray-700 text-base">${item.remaining} 件</span>
                             </div>
                         </div>
                     </div>
