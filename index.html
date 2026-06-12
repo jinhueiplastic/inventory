@@ -51,32 +51,37 @@
             fetchInventory();
         });
 
-        // 向 GAS 請求資料
+        // 向 GAS 請求資料（修正版：繞過瀏覽器 CORS 阻擋）
         function fetchInventory() {
-            // 加上時間戳記，徹底防止瀏覽器快取舊資料
-            const targetUrl = `${API_URL}?_=${new Date().getTime()}`;
-
-            fetch(targetUrl, { method: "GET" })
-                .then(response => {
-                    if (!response.ok) throw new Error('API 響應錯誤');
-                    return response.json();
-                })
-                .then(data => {
-                    // 成功取得資料，隱藏載入提示
-                    document.getElementById('loading').style.display = 'none';
-                    renderCards(data);
-                })
-                .catch(error => {
-                    console.error("資料載入失敗:", error);
-                    document.getElementById('loading').innerHTML = `
-                        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-6 rounded-xl max-w-md mx-auto shadow-sm">
-                            <div class="font-bold text-lg mb-1">❌ 雲端連線失敗</div>
-                            <p class="text-sm text-red-600 mb-3">無法順利讀取資料，這通常是因為 GAS 沒有發布更新。</p>
-                            <div class="text-xs text-left bg-white p-3 rounded border text-gray-500 font-mono overflow-x-auto">
-                                💡 解決辦法：請在 Apps Script 畫面右上方點擊「部署」->「管理部署」-> 點擊鉛筆 -> 版本選「新版本」-> 點擊「部署」即可啟用。
-                            </div>
-                        </div>`;
-                });
+            // 使用 Google 認可的重新導向模式 (redirect: "follow") 確保資料順利穿透
+            fetch(API_URL, { 
+                method: "GET",
+                redirect: "follow", // 💡 關鍵：允許瀏覽器跟隨 Google 的跳轉
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8"
+                }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('API 響應錯誤');
+                return response.json();
+            })
+            .then(data => {
+                // 成功取得資料，隱藏載入提示
+                document.getElementById('loading').style.display = 'none';
+                renderCards(data);
+            })
+            .catch(error => {
+                console.error("資料載入失敗:", error);
+                document.getElementById('loading').innerHTML = `
+                    <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-6 rounded-xl max-w-md mx-auto shadow-sm">
+                        <div class="font-bold text-lg mb-1">❌ 雲端連線失敗</div>
+                        <p class="text-sm text-red-600 mb-3">連線被瀏覽器安全性攔截，或 API 網址設定錯誤。</p>
+                        <div class="text-xs text-left bg-white p-3 rounded border text-gray-500 font-mono">
+                            錯誤訊息：${error.message}<br><br>
+                            💡 解決辦法：請確認 index.html 內的 API_URL 網址是否與您的 exec 網址完全一致。
+                        </div>
+                    </div>`;
+            });
         }
 
         // 渲染商品圖文卡片
