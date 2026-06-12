@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>錦輝塑膠 - 行動盤點系統 v2.0</title>
+    <title>錦輝塑膠 - 行動盤點系統 v2.1</title>
     <!-- 引入 Tailwind CSS 與 Google Material Icons 圖標 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -86,7 +86,7 @@
     </main>
 
     <script>
-        // 已自動綁定您最新的 GAS 網頁應用程式網址
+        // 綁定您的 GAS 網頁應用程式網址
         const API_URL = "https://script.google.com/macros/s/AKfycbw39xPwtYMRvOFI4lGgU0gaDuCHyzC4AfwTOqVkabNw_Z-0EVtRfYpndZ-ra7Tjv9iw/exec";
 
         let inventoryData = [];
@@ -111,6 +111,16 @@
                 });
         }
 
+        // 檢查是否為有效的圖片網址
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return string.match(/\.(jpeg|jpg|gif|png|webp)$/) != null || string.startsWith('http');
+            } catch (_) {
+                return false;  
+            }
+        }
+
         // 畫面渲染
         function renderInventory() {
             const unverifiedList = document.getElementById('unverified-list');
@@ -122,8 +132,8 @@
             let verifiedCount = 0;
 
             inventoryData.forEach(item => {
-                const isVerified = item.realStock !== null;
-                const isCorrect = isVerified && item.realStock === item.remaining;
+                const isVerified = item.realStock !== null && item.realStock !== undefined && item.realStock !== '';
+                const isCorrect = isVerified && parseInt(item.realStock, 10) === parseInt(item.remaining, 10);
                 
                 const card = document.createElement('div');
                 card.className = `bg-white rounded-xl p-3 border shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex items-center gap-3 transition-all duration-300 ${
@@ -131,24 +141,32 @@
                     ? 'border-emerald-100 bg-emerald-50/20' 
                     : 'border-slate-200/60 bg-white hover:border-slate-300'
                 }`;
+
+                // 處理 A 欄商品圖片區區塊
+                let imgHtml = '';
+                if (item.img && isValidUrl(item.img)) {
+                    imgHtml = `<img src="${item.img}" class="w-14 h-14 rounded-lg object-cover border border-slate-100 flex-shrink-0" alt="商品圖片">`;
+                } else {
+                    imgHtml = `
+                        <div class="w-14 h-14 rounded-lg flex flex-col items-center justify-center flex-shrink-0 border transition-colors ${
+                            isVerified ? 'bg-emerald-50 border-emerald-100 text-emerald-500' : 'bg-blue-50/60 border-blue-100 text-blue-500'
+                        }">
+                            <span class="material-icons text-xl">${isVerified ? 'inventory' : 'inventory_2'}</span>
+                        </div>
+                    `;
+                }
                 
                 card.innerHTML = `
-                    <!-- 左側小 ICON 視覺優化 -->
-                    <div class="w-12 h-12 rounded-lg flex flex-col items-center justify-center flex-shrink-0 border transition-colors ${
-                        isVerified 
-                        ? 'bg-emerald-50 border-emerald-100 text-emerald-500' 
-                        : 'bg-blue-50/60 border-blue-100 text-blue-500'
-                    }">
-                        <span class="material-icons text-xl">${isVerified ? 'inventory' : 'inventory_2'}</span>
-                    </div>
+                    <!-- 左側商品圖片 / ICON -->
+                    ${imgHtml}
                     
-                    <!-- 中間資訊 -->
+                    <!-- 中間資訊 (對齊 B 欄型號、C 欄品名) -->
                     <div class="flex-grow min-w-0">
-                        <div class="font-bold text-slate-900 text-[14px] tracking-wide truncate mb-0.5">${item.model}</div>
+                        <div class="font-bold text-slate-900 text-[14px] tracking-wide truncate mb-0.5">${item.model || '無型號'}</div>
                         <div class="text-[11px] text-slate-400 truncate mb-1.5">${item.name || '無品名描述'}</div>
                         <div class="text-xs text-slate-500 flex items-center gap-1">
                             <span>系統剩餘 (F):</span>
-                            <span class="font-bold text-slate-800 text-sm">${item.remaining}</span>
+                            <span class="font-bold text-slate-800 text-sm">${item.remaining !== undefined ? item.remaining : 0}</span>
                         </div>
                     </div>
                     
@@ -165,11 +183,11 @@
                             <span>${isCorrect ? '正確' : '相符'}</span>
                         </button>
                         
-                        <!-- 手動輸入 -->
+                        <!-- 手動輸入 (G 欄實際庫存) -->
                         <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-md p-0.5 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
                             <span class="text-[10px] text-slate-400 pl-1 font-bold">真:</span>
                             <input type="number" 
-                                   value="${item.realStock !== null ? item.realStock : ''}" 
+                                   value="${isVerified ? item.realStock : ''}" 
                                    placeholder="未檢" 
                                    onchange="uploadStock(${item.row}, this.value)"
                                    class="w-12 text-center bg-transparent p-0.5 text-xs font-bold text-slate-800 focus:outline-none">
@@ -189,7 +207,6 @@
             document.getElementById('unverified-count').innerText = unverifiedCount;
             document.getElementById('verified-count').innerText = verifiedCount;
 
-            // 當全部核對完畢的精美提示
             if (unverifiedCount === 0 && inventoryData.length > 0) {
                 unverifiedList.innerHTML = `
                     <div class="text-center py-8 bg-emerald-50/40 rounded-xl border border-dashed border-emerald-200 p-4">
@@ -233,12 +250,11 @@
             uploadStock(row, newValue);
         }
 
-        // 精緻狀態欄切換
+        // 狀態欄切換
         function updateStatus(type, text) {
             const bar = document.getElementById('status-bar');
             const txt = document.getElementById('status-text');
             
-            // 清除舊顏色
             bar.className = "text-[11px] py-1 px-4 text-center font-medium flex items-center justify-center gap-1.5 transition-all border-t ";
             
             if (type === "connecting" || type === "uploading") {
@@ -247,7 +263,6 @@
             } else if (type === "success") {
                 bar.classList.add("bg-emerald-50", "border-emerald-100", "text-emerald-700");
                 bar.innerHTML = `<span class="material-icons text-xs text-emerald-500">check_circle</span><span>${text}</span>`;
-                // 3秒後恢復靜態成功提示，避免畫面一直閃爍
                 setTimeout(() => {
                     bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>系統就緒 · 連線正常</span>`;
                 }, 3000);
