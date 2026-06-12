@@ -2,218 +2,110 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>錦輝塑膠 - 行動盤點系統 v2.2</title>
-    <!-- 引入 Tailwind CSS 與 Google Material Icons 圖標 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>錦輝塑膠業有限公司官網 JIN HUEI PLASTIC</title>
+    <!-- 引入 Tailwind CSS 進行快速排版 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
-        body { 
-            font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
-        /* 優化手機端滾動與輸入 */
-        input[type="number"] { font-size: 16px !important; }
-        .blur-bg { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 pb-16">
+<body class="bg-gray-50">
 
-    <!-- 頂部導覽列 -->
-    <header class="bg-white/80 blur-bg border-b border-slate-200/80 sticky top-0 z-50 transition-all shadow-sm">
-        <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md shadow-blue-200">
-                    錦
-                </div>
-                <div>
-                    <h1 class="text-sm font-bold text-slate-900 tracking-wide">錦輝塑膠業</h1>
-                    <p class="text-[10px] text-slate-500 font-medium tracking-wider uppercase">Inventory Cloud</p>
-                </div>
+    <header class="bg-white border-b shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div id="logo-container">
+                <div class="text-xl font-bold text-blue-600">錦輝塑膠業 JIN HUEI</div>
             </div>
-            <button onclick="loadData()" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-95 transition-all">
-                <span class="material-icons text-xl">refresh</span>
-            </button>
-        </div>
-        
-        <!-- 全域連線狀態條 -->
-        <div id="status-bar" class="bg-amber-50 border-t border-amber-100 text-[11px] text-amber-700 py-1 px-4 text-center font-medium flex items-center justify-center gap-1.5 transition-all">
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-            <span id="status-text">正在初始化雲端連線...</span>
+            
+            <div class="flex items-center gap-6">
+                <div id="store-container" class="flex gap-4 items-center"></div>
+                <div class="h-6 w-px bg-gray-300"></div>
+                <button id="lang-toggle-btn" class="text-sm font-medium text-gray-600 hover:text-blue-600">切換語言</button>
+            </div>
         </div>
     </header>
 
-    <!-- 主內容區 -->
-    <main class="max-w-md mx-auto px-4 mt-4">
+    <!-- 商品呈現主區塊 -->
+    <main class="container mx-auto px-4 py-10">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800">商品庫存一覽表</h1>
         
-        <!-- ================= 待檢查區域 ================= -->
-        <section class="mb-6">
-            <div class="flex items-center justify-between mb-2 px-1">
-                <div class="flex items-center gap-1.5">
-                    <span class="material-icons text-red-500 text-lg">pending_actions</span>
-                    <h2 class="text-sm font-bold text-slate-700">待檢查商品 <span class="text-xs font-normal text-slate-400">(G欄空白)</span></h2>
-                </div>
-                <span id="unverified-count" class="bg-red-50 text-red-600 border border-red-100 text-xs px-2.5 py-0.5 rounded-full font-bold">0</span>
-            </div>
-            <div id="unverified-list" class="space-y-3">
-                <div class="bg-white rounded-xl p-3 border border-slate-100 animate-pulse flex gap-3">
-                    <div class="w-14 h-14 bg-slate-100 rounded-lg"></div>
-                    <div class="flex-grow space-y-2 py-1">
-                        <div class="h-4 bg-slate-100 rounded w-1/3"></div>
-                        <div class="h-3 bg-slate-100 rounded w-2/3"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        <!-- 載入中的動畫提示 -->
+        <div id="loading" class="text-center py-10 text-gray-500 animate-pulse text-lg">
+            📦 正在從雲端同步最新庫存與圖片...
+        </div>
 
-        <!-- ================= 已檢查區域 ================= -->
-        <section>
-            <div class="flex items-center justify-between mb-2 px-1">
-                <div class="flex items-center gap-1.5">
-                    <span class="material-icons text-emerald-500 text-lg">task_alt</span>
-                    <h2 class="text-sm font-bold text-slate-700">已檢查商品 <span class="text-xs font-normal text-slate-400">(G欄有值)</span></h2>
-                </div>
-                <span id="verified-count" class="bg-emerald-50 text-emerald-600 border border-emerald-100 text-xs px-2.5 py-0.5 rounded-full font-bold">0</span>
-            </div>
-            <div id="verified-list" class="space-y-3 opacity-80">
-                <!-- 動態載入 -->
-            </div>
-        </section>
-
+        <!-- 圖片與商品卡片容器 -->
+        <div id="app" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
     </main>
 
+    <!-- 💡 將原本的 script.js 邏輯直接整合在這裡 -->
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbw39xPwtYMRvOFI4lGgU0gaDuCHyzC4AfwTOqVkabNw_Z-0EVtRfYpndZ-ra7Tjv9iw/exec";
-        let inventoryData = [];
+        // ⚠️ 請將下方網址替換為您 Google Apps Script「部署」後產生的網頁應用程式 URL
+        const API_URL = "https://script.google.com/macros/s/xxxxxxxxxxxx/exec"; 
 
-        function loadData() {
-            updateStatus("connecting", "正在同步 Google 試算表最新庫存...");
+        // 頁面載入時自動執行抓取資料
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchInventory();
+        });
+
+        // 從 GAS 讀取資料並渲染到網頁上
+        function fetchInventory() {
             fetch(API_URL)
-                .then(res => res.json())
+                .then(response => response.json())
                 .then(data => {
-                    if(data.error) {
-                        updateStatus("error", "試算表錯誤: " + data.error);
-                        return;
-                    }
-                    inventoryData = data;
-                    renderInventory();
-                    updateStatus("success", "已成功同步雲端 Inventory 資料");
+                    // 隱藏載入中提示
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    // 渲染商品卡片
+                    renderCards(data);
                 })
-                .catch(err => {
-                    updateStatus("error", "連線失敗，請檢查手機網路");
-                    console.error(err);
+                .catch(error => {
+                    console.error("讀取資料失敗:", error);
+                    document.getElementById('loading').innerText = "❌ 無法載入資料，請確認 API 網址是否正確或已公開發布。";
                 });
         }
 
-        // 增強型網址驗證：過濾掉公式殘留文字，確保是真實 http 網址
-        function isValidUrl(string) {
-            if (!string || typeof string !== 'string') return false;
-            const trimmed = string.trim();
-            if (trimmed.startsWith('=') || trimmed.includes('IMAGE') || trimmed.includes('VLOOKUP')) return false;
-            try {
-                new URL(trimmed);
-                return trimmed.startsWith('http');
-            } catch (_) {
-                return false;  
+        // 動態建立 HTML 結構（含圖片標籤）
+        function renderCards(items) {
+            const container = document.getElementById('app');
+            
+            if (!items || items.length === 0) {
+                container.innerHTML = `<div class="text-gray-500 col-span-full text-center">目前無任何商品資料</div>`;
+                return;
             }
-        }
 
-        function renderInventory() {
-            const unverifiedList = document.getElementById('unverified-list');
-            const verifiedList = document.getElementById('verified-list');
-            unverifiedList.innerHTML = '';
-            verifiedList.innerHTML = '';
+            container.innerHTML = items.map(item => {
+                // 💡 檢查是否有圖片網址，若無則顯示預設的預留圖
+                const displayImg = item.imgUrl && item.imgUrl.startsWith('http') 
+                    ? item.imgUrl 
+                    : "https://placehold.co/300x300/e2e8f0/64748b?text=No+Image";
 
-            let unverifiedCount = 0;
-            let verifiedCount = 0;
-
-            inventoryData.forEach(item => {
-                const isVerified = item.realStock !== null && item.realStock !== undefined && item.realStock !== '';
-                const isCorrect = isVerified && parseInt(item.realStock, 10) === parseInt(item.remaining, 10);
-                
-                const card = document.createElement('div');
-                card.className = `bg-white rounded-xl p-3 border shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex items-center gap-3 transition-all duration-300 ${
-                    isVerified ? 'border-emerald-100 bg-emerald-50/20' : 'border-slate-200/60 bg-white hover:border-slate-300'
-                }`;
-
-                // 圖片顯示邏輯：優先採用後端成功萃取出的純網址
-                let imgHtml = '';
-                if (item.img && isValidUrl(item.img)) {
-                    imgHtml = `<img src="${item.img.trim()}" class="w-14 h-14 rounded-lg object-cover border border-slate-100 flex-shrink-0" alt="商品圖片" onerror="this.src='https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=150&auto=format&fit=crop&q=60';">`;
-                } else {
-                    imgHtml = `
-                        <div class="w-14 h-14 rounded-lg flex flex-col items-center justify-center flex-shrink-0 border bg-blue-50/60 border-blue-100 text-blue-500">
-                            <span class="material-icons text-xl">image_not_supported</span>
+                return `
+                    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                        <!-- 商品圖片區塊 -->
+                        <div class="w-full h-48 bg-gray-100 flex items-center justify-center overflow-hidden border-b">
+                            <img src="${displayImg}" class="w-full h-full object-cover" alt="${item.name}" onerror="this.src='https://placehold.co/300x300/fee2e2/ef4444?text=Image+Error'">
                         </div>
-                    `;
-                }
-                
-                card.innerHTML = `
-                    ${imgHtml}
-                    <div class="flex-grow min-w-0">
-                        <div class="font-bold text-slate-900 text-[14px] tracking-wide truncate mb-0.5">${item.model || '無型號'}</div>
-                        <div class="text-[11px] text-slate-400 truncate mb-1.5">${item.name || '無品名描述'}</div>
-                        <div class="text-xs text-slate-500 flex items-center gap-1">
-                            <span>系統剩餘 (F):</span>
-                            <span class="font-bold text-slate-800 text-sm">${item.remaining !== undefined ? item.remaining : 0}</span>
-                        </div>
-                    </div>
-                    <div class="flex flex-col items-end gap-2 flex-shrink-0">
-                        <button onclick="quickCheck(${item.row}, ${item.remaining}, ${isCorrect})" 
-                                class="text-[11px] px-2.5 py-1 rounded-md font-medium border flex items-center gap-0.5 transition-all active:scale-95 ${
-                                    isCorrect ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 text-slate-600 border-slate-200'
-                                }">
-                            <span class="material-icons text-xs">${isCorrect ? 'check_circle' : 'done'}</span>
-                            <span>${isCorrect ? '正確' : '相符'}</span>
-                        </button>
-                        <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-md p-0.5 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
-                            <span class="text-[10px] text-slate-400 pl-1 font-bold">真:</span>
-                            <input type="number" value="${isVerified ? item.realStock : ''}" placeholder="未檢" onchange="uploadStock(${item.row}, this.value)" class="w-12 text-center bg-transparent p-0.5 text-xs font-bold text-slate-800 focus:outline-none">
+                        
+                        <!-- 商品文字內容區塊 -->
+                        <div class="p-5 flex-1 flex flex-col justify-between">
+                            <div>
+                                <span class="inline-block text-xs font-semibold tracking-wider uppercase px-2 py-1 rounded bg-blue-50 text-blue-600 mb-2">
+                                    ${item.model}
+                                </span>
+                                <h2 class="text-lg font-bold text-gray-800 mb-1">${item.name}</h2>
+                            </div>
+                            
+                            <div class="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center text-sm">
+                                <span class="text-gray-500">系統剩餘：</span>
+                                <span class="font-bold ${item.remaining <= 10 ? 'text-red-500 font-extrabold' : 'text-gray-700'}">
+                                    ${item.remaining} 件
+                                </span>
+                            </div>
                         </div>
                     </div>
                 `;
-
-                if (isVerified) { torrent = verifiedList.appendChild(card); verifiedCount++; } else { unverifiedList.appendChild(card); unverifiedCount++; }
-            });
-
-            document.getElementById('unverified-count').innerText = unverifiedCount;
-            document.getElementById('verified-count').innerText = verifiedCount;
+            }).join('');
         }
-
-        function uploadStock(row, value) {
-            updateStatus("uploading", "正在寫入雲端試算表 G 欄...");
-            const realStock = value === '' ? null : parseInt(value, 10);
-            fetch(API_URL, { method: "POST", body: JSON.stringify({ row: row, realStock: realStock }) })
-            .then(res => res.json())
-            .then(res => {
-                if(res.status === "success") {
-                    const item = inventoryData.find(i => i.row === row);
-                    if(item) item.realStock = realStock;
-                    renderInventory();
-                    updateStatus("success", "數據已成功儲存！");
-                }
-            }).catch(err => updateStatus("error", "回傳超時"));
-        }
-
-        function quickCheck(row, val, alreadyCorrect) { uploadStock(row, alreadyCorrect ? '' : val); }
-
-        function updateStatus(type, text) {
-            const bar = document.getElementById('status-bar');
-            bar.className = "text-[11px] py-1 px-4 text-center font-medium flex items-center justify-center gap-1.5 transition-all border-t ";
-            if (type === "connecting" || type === "uploading") {
-                bar.classList.add("bg-amber-50", "border-amber-100", "text-amber-700");
-                bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span><span>${text}</span>`;
-            } else if (type === "success") {
-                bar.classList.add("bg-emerald-50", "border-emerald-100", "text-emerald-700");
-                bar.innerHTML = `<span class="material-icons text-xs text-emerald-500">check_circle</span><span>${text}</span>`;
-                setTimeout(() => { bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>系統就緒 · 連線正常</span>`; }, 3000);
-            } else if (type === "error") {
-                bar.classList.add("bg-rose-50", "border-rose-100", "text-rose-700");
-                bar.innerHTML = `<span class="material-icons text-xs text-rose-500">error</span><span>${text}</span>`;
-            }
-        }
-        loadData();
     </script>
 </body>
 </html>
