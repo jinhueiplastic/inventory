@@ -8,14 +8,14 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
-        body { 
+        body {
             font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
         .blur-bg { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-        .tab-active { 
-            background: white; 
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08); 
+        .tab-active {
+            background: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
             color: #2563eb;
             font-weight: 700;
         }
@@ -26,19 +26,33 @@
             from { opacity: 0; transform: translateY(8px); }
             to   { opacity: 1; transform: translateY(0); }
         }
+        .checkbox-custom {
+            width: 20px; height: 20px; border-radius: 6px;
+            border: 2px solid #cbd5e1; background: white;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; cursor: pointer; transition: all 0.15s;
+        }
+        .checkbox-custom.checked {
+            background: #f97316; border-color: #f97316;
+        }
+        /* 修正：用 object-fit contain 避免圖片被截斷，加上 crossorigin */
+        .product-img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            background: #f8fafc;
+        }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 pb-24">
+<body class="bg-slate-50 min-h-screen text-slate-800 pb-32">
 
     <!-- 頂部導覽列 -->
     <header class="bg-white/80 blur-bg border-b border-slate-200/80 sticky top-0 z-50 shadow-sm">
         <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <!-- 返回盤點系統 -->
                 <a href="./index.html" class="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 active:scale-95 transition-all mr-1">
                     <span class="material-icons text-xl">arrow_back</span>
                 </a>
-                <div class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md shadow-orange-200">
+                <div class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white shadow-md shadow-orange-200">
                     <span class="material-icons text-base">storefront</span>
                 </div>
                 <div>
@@ -59,8 +73,13 @@
 
         <!-- 分頁 Tab -->
         <div class="bg-slate-100/80 mx-4 my-2 rounded-xl p-1 flex gap-1">
-            <button onclick="switchTab('pending')" id="tab-pending"
+            <button onclick="switchTab('picklist')" id="tab-picklist"
                 class="tab-active flex-1 py-1.5 rounded-lg text-xs transition-all flex items-center justify-center gap-1">
+                <span class="material-icons text-sm">list_alt</span>
+                <span>拿貨表</span>
+            </button>
+            <button onclick="switchTab('pending')" id="tab-pending"
+                class="flex-1 py-1.5 rounded-lg text-xs text-slate-500 transition-all flex items-center justify-center gap-1">
                 <span class="material-icons text-sm">local_shipping</span>
                 <span>未出貨</span>
                 <span id="badge-pending" class="bg-red-500 text-white text-[10px] px-1.5 rounded-full leading-4 hidden">0</span>
@@ -71,10 +90,11 @@
                 <span>已出貨</span>
                 <span id="badge-shipped" class="bg-emerald-500 text-white text-[10px] px-1.5 rounded-full leading-4 hidden">0</span>
             </button>
-            <button onclick="switchTab('picklist')" id="tab-picklist"
+            <button onclick="switchTab('restock')" id="tab-restock"
                 class="flex-1 py-1.5 rounded-lg text-xs text-slate-500 transition-all flex items-center justify-center gap-1">
-                <span class="material-icons text-sm">list_alt</span>
-                <span>拿貨表</span>
+                <span class="material-icons text-sm">inventory</span>
+                <span>補貨</span>
+                <span id="badge-restock" class="bg-amber-500 text-white text-[10px] px-1.5 rounded-full leading-4 hidden">0</span>
             </button>
         </div>
     </header>
@@ -82,8 +102,45 @@
     <!-- 主內容 -->
     <main class="max-w-md mx-auto px-4 mt-3">
 
+        <!-- ══ 拿貨表（預設顯示）══ -->
+        <div id="page-picklist">
+            <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
+                <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 flex items-center gap-2">
+                    <span class="material-icons text-white text-lg">inventory_2</span>
+                    <div>
+                        <div class="text-white font-bold text-sm">拿貨清單</div>
+                        <div class="text-orange-100 text-[10px]">統計所有未出貨訂單商品</div>
+                    </div>
+                    <div class="ml-auto text-right">
+                        <div id="picklist-total" class="text-white font-bold text-lg">0</div>
+                        <div class="text-orange-100 text-[10px]">種商品</div>
+                    </div>
+                </div>
+                <div id="picklist-body" class="divide-y divide-slate-100">
+                    <div class="text-center py-6 text-slate-400 text-xs">載入中...</div>
+                </div>
+            </div>
+        </div>
+
         <!-- ══ 未出貨頁 ══ -->
-        <div id="page-pending">
+        <div id="page-pending" class="hidden">
+            <!-- 全選工具列 -->
+            <div id="select-toolbar" class="bg-white rounded-xl border border-slate-200 p-3 mb-3 flex items-center justify-between hidden">
+                <button onclick="toggleSelectAll()" id="btn-select-all"
+                    class="flex items-center gap-2 text-sm text-slate-600 font-medium active:scale-95 transition-all">
+                    <div id="select-all-box" class="checkbox-custom">
+                        <span class="material-icons text-white text-sm hidden" id="select-all-check">check</span>
+                    </div>
+                    <span>全選所有訂單</span>
+                </button>
+                <button onclick="shipSelected()" id="btn-ship-selected"
+                    class="bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 active:scale-95 transition-all disabled:opacity-40"
+                    disabled>
+                    <span class="material-icons text-sm">local_shipping</span>
+                    一鍵出貨
+                    <span id="selected-count" class="bg-white/30 text-white px-1.5 rounded-full text-[10px] leading-4 ml-0.5">0</span>
+                </button>
+            </div>
             <div id="pending-list" class="space-y-3">
                 <!-- 骨架屏 -->
                 <div class="bg-white rounded-xl p-3 border border-slate-100 animate-pulse flex gap-3">
@@ -94,14 +151,6 @@
                         <div class="h-3 bg-slate-100 rounded w-1/4"></div>
                     </div>
                 </div>
-                <div class="bg-white rounded-xl p-3 border border-slate-100 animate-pulse flex gap-3">
-                    <div class="w-16 h-16 bg-slate-100 rounded-lg flex-shrink-0"></div>
-                    <div class="flex-grow space-y-2 py-1">
-                        <div class="h-3 bg-slate-100 rounded w-1/4"></div>
-                        <div class="h-4 bg-slate-100 rounded w-3/4"></div>
-                        <div class="h-3 bg-slate-100 rounded w-1/3"></div>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -110,17 +159,17 @@
             <div id="shipped-list" class="space-y-3"></div>
         </div>
 
-        <!-- ══ 拿貨表 ══ -->
-        <div id="page-picklist" class="hidden">
+        <!-- ══ 補貨頁 ══ -->
+        <div id="page-restock" class="hidden">
             <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
-                <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 flex items-center gap-2">
-                    <span class="material-icons text-white text-lg">inventory_2</span>
+                <div class="bg-gradient-to-r from-amber-500 to-orange-400 px-4 py-3 flex items-center gap-2">
+                    <span class="material-icons text-white text-lg">inventory</span>
                     <div>
-                        <div class="text-white font-bold text-sm">拿貨清單</div>
-                        <div class="text-orange-100 text-[10px]">統計所有未出貨訂單商品</div>
+                        <div class="text-white font-bold text-sm">補貨管理</div>
+                        <div class="text-amber-100 text-[10px]">已售完商品庫存狀態</div>
                     </div>
                 </div>
-                <div id="picklist-body" class="divide-y divide-slate-100">
+                <div id="restock-body" class="divide-y divide-slate-100">
                     <div class="text-center py-6 text-slate-400 text-xs">載入中...</div>
                 </div>
             </div>
@@ -128,23 +177,16 @@
 
     </main>
 
-    <!-- 底部出貨確認彈窗 -->
-    <div id="ship-modal" class="fixed inset-0 z-50 hidden">
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeModal()"></div>
-        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-5 max-w-md mx-auto shadow-2xl">
+    <!-- 出貨確認彈窗 -->
+    <div id="ship-modal" class="fixed inset-0 z-50 hidden" style="position:fixed;">
+        <div class="absolute inset-0 bg-black/40" onclick="closeModal()" style="position:absolute;top:0;left:0;right:0;bottom:0;"></div>
+        <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-5 max-w-md mx-auto shadow-2xl" style="position:absolute;bottom:0;left:0;right:0;">
             <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
-            <div class="flex gap-3 mb-4">
-                <img id="modal-img" src="" class="w-16 h-16 rounded-xl object-cover border border-slate-100 bg-slate-50">
-                <div class="flex-grow min-w-0">
-                    <div id="modal-order" class="text-xs text-orange-600 font-bold mb-0.5"></div>
-                    <div id="modal-name" class="text-sm font-bold text-slate-800 leading-snug"></div>
-                    <div id="modal-qty" class="text-xs text-slate-500 mt-1"></div>
-                </div>
-            </div>
-            <button onclick="confirmShip()" 
-                class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-orange-200">
+            <div id="modal-preview" class="mb-4"></div>
+            <button onclick="confirmShip()"
+                class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all">
                 <span class="material-icons">local_shipping</span>
-                確認已出貨
+                <span id="modal-btn-text">確認已出貨</span>
             </button>
             <button onclick="closeModal()" class="w-full mt-2 text-slate-500 text-sm py-2">取消</button>
         </div>
@@ -153,112 +195,159 @@
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbw39xPwtYMRvOFI4lGgU0gaDuCHyzC4AfwTOqVkabNw_Z-0EVtRfYpndZ-ra7Tjv9iw/exec";
 
-        let allOrders = [];
-        let currentTab = 'pending';
-        let pendingShipRow = null;
+        let allOrders    = [];
+        let currentTab   = 'picklist';
+        let pendingGroup = null;
+        let selectedRows = new Set();
+        let isBulkShip   = false;
+
+        // ── 補貨狀態存在 localStorage（不需後端）──
+        function getRestockStatus() {
+            try { return JSON.parse(localStorage.getItem('restock_status') || '{}'); } catch(e) { return {}; }
+        }
+        function saveRestockStatus(map) {
+            localStorage.setItem('restock_status', JSON.stringify(map));
+        }
 
         window.addEventListener('DOMContentLoaded', loadOrders);
 
-        // ── 載入訂單 ──
         function loadOrders() {
             updateStatus("connecting", "正在同步蝦皮訂單資料...");
             window._shopeeOrdersCb = function(data) {
                 document.getElementById('jsonp-shopee')?.remove();
                 if (data.error) { updateStatus("error", data.error); return; }
                 allOrders = data;
+                selectedRows.clear();
                 renderAll();
                 updateStatus("success", `已載入 ${data.length} 筆訂單資料`);
             };
             const s = document.createElement('script');
-            s.id = 'jsonp-shopee';
+            s.id  = 'jsonp-shopee';
             s.src = `${API_URL}?action=shopee_orders&callback=_shopeeOrdersCb&_=${Date.now()}`;
             s.onerror = () => updateStatus("error", "連線失敗，請重試");
             document.body.appendChild(s);
         }
 
-        // ── 渲染所有分頁 ──
         function renderAll() {
-            const pending = allOrders.filter(o => !o.shipped && o.orderId);
-            const shipped = allOrders.filter(o => o.shipped && o.orderId);
+            const pending  = allOrders.filter(o => !o.shipped && o.orderId);
+            const shipped  = allOrders.filter(o => o.shipped  && o.orderId);
+            const soldouts = allOrders.filter(o => !o.orderId); // 已售完通知（G欄=是）
 
-            // 更新 badge
+            // badges
             const bp = document.getElementById('badge-pending');
             const bs = document.getElementById('badge-shipped');
-            bp.textContent = pending.length;
-            bs.textContent = shipped.length;
-            bp.classList.toggle('hidden', pending.length === 0);
-            bs.classList.toggle('hidden', shipped.length === 0);
+            const br = document.getElementById('badge-restock');
+            bp.textContent = pending.length;  bp.classList.toggle('hidden', pending.length  === 0);
+            bs.textContent = shipped.length;  bs.classList.toggle('hidden', shipped.length  === 0);
+            br.textContent = soldouts.length; br.classList.toggle('hidden', soldouts.length === 0);
 
+            renderPicklist(pending);
             renderPending(pending);
             renderShipped(shipped);
-            renderPicklist(pending);
+            renderRestock(soldouts);
         }
 
-        // ── 未出貨列表 ──
-        function renderPending(orders) {
-            const el = document.getElementById('pending-list');
+        // ══ 拿貨表 ══
+        function renderPicklist(orders) {
+            const el = document.getElementById('picklist-body');
+            const totalEl = document.getElementById('picklist-total');
 
             if (orders.length === 0) {
+                totalEl.textContent = '0';
+                el.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">目前無待出貨訂單</div>`;
+                return;
+            }
+
+            // 彙總相同商品（以商品名稱為 key）
+            const summary = new Map();
+            orders.forEach(item => {
+                const key = item.name;
+                if (!summary.has(key)) summary.set(key, { name: item.name, imgUrl: item.imgUrl, totalQty: 0 });
+                summary.get(key).totalQty += (parseInt(item.qty) || 0);
+            });
+
+            const sorted = Array.from(summary.values()).sort((a, b) => b.totalQty - a.totalQty);
+            totalEl.textContent = sorted.length;
+
+            el.innerHTML = sorted.map((s, idx) => `
+                <div class="flex items-center gap-3 px-3 py-2.5">
+                    <div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center flex-shrink-0">${idx + 1}</div>
+                    <div class="w-14 h-14 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0">
+                        ${imgTag(s.imgUrl, 56)}
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <div class="text-[13px] font-medium text-slate-700 leading-snug line-clamp-2">${s.name}</div>
+                    </div>
+                    <div class="flex-shrink-0 text-right">
+                        <div class="text-2xl font-bold text-orange-500">${s.totalQty}</div>
+                        <div class="text-[10px] text-slate-400">件</div>
+                    </div>
+                </div>`).join('');
+        }
+
+        // ══ 未出貨 ══
+        function renderPending(orders) {
+            const el      = document.getElementById('pending-list');
+            const toolbar = document.getElementById('select-toolbar');
+
+            if (orders.length === 0) {
+                toolbar.classList.add('hidden');
                 el.innerHTML = `
                     <div class="text-center py-10 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200">
                         <span class="material-icons text-emerald-400 text-4xl mb-2">celebration</span>
                         <div class="text-sm font-bold text-emerald-700">所有訂單皆已出貨！</div>
-                        <div class="text-xs text-emerald-500 mt-1">太厲害了</div>
                     </div>`;
                 return;
             }
 
-            // 依訂單編號分組
+            toolbar.classList.remove('hidden');
             const grouped = groupByOrder(orders);
             el.innerHTML = '';
 
             grouped.forEach(group => {
                 const card = document.createElement('div');
                 card.className = 'order-card bg-white rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] overflow-hidden slide-in';
-                
-                // 訂單標頭
-                const headerHtml = `
-                    <div class="bg-slate-50 border-b border-slate-100 px-3 py-2 flex items-center justify-between">
-                        <div class="flex items-center gap-1.5">
-                            <span class="material-icons text-orange-400 text-sm">receipt_long</span>
-                            <span class="text-xs font-bold text-slate-700">${group.orderId}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] text-slate-400">${group.items[0]?.buyer || ''}</span>
-                            <span class="text-[10px] text-slate-400">${group.items[0]?.date || ''}</span>
-                        </div>
-                    </div>`;
+                card.id = `card-${group.orderId.replace('#','')}`;
 
-                // 商品列表
-                const itemsHtml = group.items.map(item => `
-                    <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
-                        <div class="w-14 h-14 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0">
-                            <img src="${item.imgUrl || 'https://placehold.co/100x100/f1f5f9/94a3b8?text=?'}"
-                                 class="w-full h-full object-cover"
-                                 onerror="this.src='https://placehold.co/100x100/fef2f2/ef4444?text=Err'">
-                        </div>
-                        <div class="flex-grow min-w-0">
-                            <div class="text-[13px] font-medium text-slate-800 leading-snug line-clamp-2">${item.name}</div>
-                            <div class="text-xs text-slate-400 mt-0.5">數量：<span class="font-bold text-slate-700 text-sm">${item.qty}</span></div>
-                        </div>
-                    </div>`).join('');
+                const isChecked = group.rows.every(r => selectedRows.has(r));
 
-                // 出貨按鈕（整張訂單一起出）
-                const footerHtml = `
+                card.innerHTML = `
+                    <!-- 訂單標頭 -->
+                    <div class="bg-slate-50 border-b border-slate-100 px-3 py-2 flex items-center gap-2">
+                        <div class="checkbox-custom ${isChecked ? 'checked' : ''}" onclick="toggleOrderSelect(${JSON.stringify(group.rows)}, this)">
+                            <span class="material-icons text-white text-sm ${isChecked ? '' : 'hidden'}">check</span>
+                        </div>
+                        <span class="material-icons text-orange-400 text-sm">receipt_long</span>
+                        <span class="text-xs font-bold text-slate-700 flex-grow">${group.orderId}</span>
+                        <span class="text-[10px] text-slate-400">${group.items[0]?.buyer || ''}</span>
+                        <span class="text-[10px] text-slate-400">${group.items[0]?.date || ''}</span>
+                    </div>
+                    <!-- 商品列表 -->
+                    ${group.items.map(item => `
+                        <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
+                            <div class="w-14 h-14 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0">
+                                ${imgTag(item.imgUrl, 56)}
+                            </div>
+                            <div class="flex-grow min-w-0">
+                                <div class="text-[13px] font-medium text-slate-800 leading-snug line-clamp-2">${item.name}</div>
+                                <div class="text-xs text-slate-400 mt-0.5">數量：<span class="font-bold text-slate-700 text-sm">${item.qty}</span></div>
+                            </div>
+                        </div>`).join('')}
+                    <!-- 出貨按鈕 -->
                     <div class="px-3 py-2 bg-slate-50/50">
-                        <button onclick="openShipModal(${JSON.stringify(group).replace(/"/g, '&quot;')})"
-                            class="w-full bg-orange-500 text-white text-sm font-bold py-2 rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-sm shadow-orange-100">
+                        <button onclick="openShipModal(${JSON.stringify(group).replace(/"/g,'&quot;')})"
+                            class="w-full bg-orange-500 text-white text-sm font-bold py-2 rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all">
                             <span class="material-icons text-base">local_shipping</span>
                             標記已出貨
                         </button>
                     </div>`;
-
-                card.innerHTML = headerHtml + itemsHtml + footerHtml;
                 el.appendChild(card);
             });
+
+            updateSelectUI();
         }
 
-        // ── 已出貨列表 ──
+        // ══ 已出貨 ══
         function renderShipped(orders) {
             const el = document.getElementById('shipped-list');
             if (orders.length === 0) {
@@ -270,125 +359,215 @@
             grouped.forEach(group => {
                 const card = document.createElement('div');
                 card.className = 'order-card bg-white rounded-xl border border-emerald-100 shadow-[0_2px_8px_rgba(0,0,0,0.02)] overflow-hidden slide-in opacity-80';
-                const headerHtml = `
+                card.innerHTML = `
                     <div class="bg-emerald-50 border-b border-emerald-100 px-3 py-2 flex items-center justify-between">
                         <div class="flex items-center gap-1.5">
                             <span class="material-icons text-emerald-500 text-sm">check_circle</span>
                             <span class="text-xs font-bold text-slate-700">${group.orderId}</span>
+                            <span class="text-[10px] text-slate-400">${group.items[0]?.buyer || ''}</span>
                         </div>
-                        <div class="text-[10px] text-emerald-600 font-medium">
-                            出貨 ${group.items[0]?.shippedAt || ''}
-                        </div>
-                    </div>`;
-                const itemsHtml = group.items.map(item => `
-                    <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
-                        <div class="w-12 h-12 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0 opacity-70">
-                            <img src="${item.imgUrl || 'https://placehold.co/100x100/f1f5f9/94a3b8?text=?'}"
-                                 class="w-full h-full object-cover"
-                                 onerror="this.src='https://placehold.co/100x100/fef2f2/ef4444?text=Err'">
-                        </div>
-                        <div class="flex-grow min-w-0">
-                            <div class="text-[12px] text-slate-500 leading-snug line-clamp-2">${item.name}</div>
-                            <div class="text-xs text-slate-400 mt-0.5">數量：<span class="font-medium text-slate-600">${item.qty}</span></div>
-                        </div>
-                    </div>`).join('');
-                // 撤銷按鈕
-                const footerHtml = `
+                        <div class="text-[10px] text-emerald-600 font-medium">出貨 ${group.items[0]?.shippedAt || ''}</div>
+                    </div>
+                    ${group.items.map(item => `
+                        <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
+                            <div class="w-12 h-12 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0 opacity-70">
+                                ${imgTag(item.imgUrl, 48)}
+                            </div>
+                            <div class="flex-grow min-w-0">
+                                <div class="text-[12px] text-slate-500 leading-snug line-clamp-2">${item.name}</div>
+                                <div class="text-xs text-slate-400 mt-0.5">數量：<span class="font-medium text-slate-600">${item.qty}</span></div>
+                            </div>
+                        </div>`).join('')}
                     <div class="px-3 py-2">
-                        <button onclick="unship(${group.rows.join(',')})"
+                        <button onclick="unship(${JSON.stringify(group.rows)})"
                             class="w-full border border-slate-200 text-slate-500 text-xs font-medium py-1.5 rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all">
-                            <span class="material-icons text-sm">undo</span>
-                            撤銷出貨
+                            <span class="material-icons text-sm">undo</span>撤銷出貨
                         </button>
                     </div>`;
-                card.innerHTML = headerHtml + itemsHtml + footerHtml;
                 el.appendChild(card);
             });
         }
 
-        // ── 拿貨表 ──
-        function renderPicklist(pendingOrders) {
-            const el = document.getElementById('picklist-body');
-            if (pendingOrders.length === 0) {
-                el.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">目前無待出貨訂單</div>`;
+        // ══ 補貨管理 ══
+        function renderRestock(soldouts) {
+            const el = document.getElementById('restock-body');
+            if (soldouts.length === 0) {
+                el.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">目前無已售完商品通知</div>`;
                 return;
             }
-            // 彙總相同商品名稱
-            const summary = new Map();
-            pendingOrders.forEach(item => {
-                const key = item.name;
-                if (!summary.has(key)) {
-                    summary.set(key, { name: item.name, imgUrl: item.imgUrl, totalQty: 0 });
-                }
-                summary.get(key).totalQty += (parseInt(item.qty) || 0);
-            });
-            // 依數量排序
-            const sorted = Array.from(summary.values()).sort((a, b) => b.totalQty - a.totalQty);
-            el.innerHTML = sorted.map((s, idx) => `
-                <div class="flex items-center gap-3 px-3 py-2.5">
-                    <div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center flex-shrink-0">
-                        ${idx + 1}
-                    </div>
-                    <div class="w-12 h-12 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0">
-                        <img src="${s.imgUrl || 'https://placehold.co/100x100/f1f5f9/94a3b8?text=?'}"
-                             class="w-full h-full object-cover"
-                             onerror="this.src='https://placehold.co/100x100/fef2f2/ef4444?text=Err'">
+            const status = getRestockStatus();
+            el.innerHTML = soldouts.map((item, idx) => {
+                const key       = item.name + '_' + item.row;
+                const curStatus = status[key] || 'pending';
+                return `
+                <div class="flex items-center gap-3 px-3 py-3" id="restock-row-${idx}">
+                    <div class="w-14 h-14 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0">
+                        ${imgTag(item.imgUrl, 56)}
                     </div>
                     <div class="flex-grow min-w-0">
-                        <div class="text-[13px] font-medium text-slate-700 leading-snug line-clamp-2">${s.name}</div>
+                        <div class="text-[13px] font-medium text-slate-700 leading-snug line-clamp-2">${item.name}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${item.date || '通知時間不明'}</div>
                     </div>
-                    <div class="flex-shrink-0 text-right">
-                        <div class="text-xl font-bold text-orange-500">${s.totalQty}</div>
-                        <div class="text-[10px] text-slate-400">件</div>
+                    <div class="flex flex-col gap-1 flex-shrink-0">
+                        <button onclick="setRestock('${key}', 'restocked', ${idx})"
+                            class="text-[11px] px-2.5 py-1 rounded-lg font-bold border flex items-center gap-0.5 transition-all active:scale-95 ${curStatus === 'restocked' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}">
+                            <span class="material-icons text-xs">check_circle</span>已補貨
+                        </button>
+                        <button onclick="setRestock('${key}', 'shortage', ${idx})"
+                            class="text-[11px] px-2.5 py-1 rounded-lg font-bold border flex items-center gap-0.5 transition-all active:scale-95 ${curStatus === 'shortage' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-500 border-slate-200'}">
+                            <span class="material-icons text-xs">remove_circle</span>缺貨
+                        </button>
                     </div>
-                </div>`).join('');
+                </div>`;
+            }).join('');
         }
 
-        // ── 出貨確認彈窗 ──
-        let pendingGroup = null;
+        // ══ 補貨狀態切換（純前端）══
+        function setRestock(key, newStatus, idx) {
+            const map = getRestockStatus();
+            map[key]  = map[key] === newStatus ? 'pending' : newStatus; // 再按一次取消
+            saveRestockStatus(map);
+            // 重新渲染補貨頁
+            const soldouts = allOrders.filter(o => !o.orderId);
+            renderRestock(soldouts);
+        }
+
+        // ══ 圖片輔助函式（修正：加 crossorigin，避免 CORS 失敗；備援到 placeholder）══
+        function imgTag(url, size) {
+            const placeholder = `https://placehold.co/${size}x${size}/f1f5f9/94a3b8?text=?`;
+            if (!url || !url.startsWith('http')) {
+                return `<img src="${placeholder}" class="product-img" alt="商品圖片">`;
+            }
+            // 蝦皮圖片不支援 CORS，改用 referrerpolicy 讓瀏覽器允許跨域顯示
+            return `<img src="${url}"
+                         class="product-img"
+                         referrerpolicy="no-referrer"
+                         alt="商品圖片"
+                         onerror="this.onerror=null;this.src='${placeholder}'">`;
+        }
+
+        // ══ 勾選邏輯 ══
+        function toggleOrderSelect(rows, boxEl) {
+            const allChecked = rows.every(r => selectedRows.has(r));
+            rows.forEach(r => allChecked ? selectedRows.delete(r) : selectedRows.add(r));
+            updateSelectUI();
+            // 重新渲染這張卡的 checkbox（不全部 re-render，避免閃爍）
+            const isNowChecked = rows.every(r => selectedRows.has(r));
+            boxEl.classList.toggle('checked', isNowChecked);
+            const check = boxEl.querySelector('.material-icons');
+            if (check) check.classList.toggle('hidden', !isNowChecked);
+        }
+
+        function toggleSelectAll() {
+            const pending = allOrders.filter(o => !o.shipped && o.orderId);
+            const allRows = pending.map(o => o.row);
+            const allSelected = allRows.every(r => selectedRows.has(r));
+            if (allSelected) {
+                allRows.forEach(r => selectedRows.delete(r));
+            } else {
+                allRows.forEach(r => selectedRows.add(r));
+            }
+            renderPending(pending);
+        }
+
+        function updateSelectUI() {
+            const pending    = allOrders.filter(o => !o.shipped && o.orderId);
+            const allRows    = pending.map(o => o.row);
+            const allChecked = allRows.length > 0 && allRows.every(r => selectedRows.has(r));
+            const count      = selectedRows.size;
+
+            const box   = document.getElementById('select-all-box');
+            const chk   = document.getElementById('select-all-check');
+            const btn   = document.getElementById('btn-ship-selected');
+            const cntEl = document.getElementById('selected-count');
+
+            if (box) { box.classList.toggle('checked', allChecked); }
+            if (chk) { chk.classList.toggle('hidden', !allChecked); }
+            if (btn) { btn.disabled = count === 0; }
+            if (cntEl) { cntEl.textContent = count; }
+        }
+
+        // ══ 出貨彈窗 ══
         function openShipModal(group) {
+            isBulkShip   = false;
             pendingGroup = group;
-            const first = group.items[0];
-            document.getElementById('modal-img').src   = first.imgUrl || 'https://placehold.co/100x100/f1f5f9/94a3b8?text=?';
-            document.getElementById('modal-order').textContent = group.orderId;
-            document.getElementById('modal-name').textContent  = group.items.length > 1
-                ? `共 ${group.items.length} 件商品` : first.name;
-            document.getElementById('modal-qty').textContent   = group.items.length > 1
-                ? group.items.map(i => `${i.name} ×${i.qty}`).join('、') : `數量：${first.qty}`;
+            document.getElementById('modal-btn-text').textContent = '確認已出貨';
+
+            const preview = group.items.map(item => `
+                <div class="flex gap-3 items-center mb-2">
+                    <div class="w-12 h-12 rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex-shrink-0">
+                        ${imgTag(item.imgUrl, 48)}
+                    </div>
+                    <div class="min-w-0">
+                        <div class="text-xs font-bold text-orange-600">${group.orderId}</div>
+                        <div class="text-sm font-bold text-slate-800 leading-snug line-clamp-1">${item.name}</div>
+                        <div class="text-xs text-slate-400">數量：${item.qty}</div>
+                    </div>
+                </div>`).join('');
+            document.getElementById('modal-preview').innerHTML = preview;
             document.getElementById('ship-modal').classList.remove('hidden');
         }
+
+        function openBulkShipModal() {
+            isBulkShip = true;
+            const count = selectedRows.size;
+            document.getElementById('modal-btn-text').textContent = `確認出貨 ${count} 筆訂單`;
+            document.getElementById('modal-preview').innerHTML = `
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                        <span class="material-icons text-orange-500 text-2xl">local_shipping</span>
+                    </div>
+                    <div>
+                        <div class="text-sm font-bold text-slate-800">批次出貨</div>
+                        <div class="text-xs text-slate-500">共 ${count} 筆訂單將標記為已出貨</div>
+                    </div>
+                </div>`;
+            document.getElementById('ship-modal').classList.remove('hidden');
+        }
+
         function closeModal() {
             document.getElementById('ship-modal').classList.add('hidden');
             pendingGroup = null;
+            isBulkShip   = false;
         }
 
-        // ── 確認出貨（對每一列都寫入時間）──
+        // ══ 一鍵全部出貨 ══
+        function shipSelected() {
+            if (selectedRows.size === 0) return;
+            openBulkShipModal();
+        }
+
         async function confirmShip() {
-            if (!pendingGroup) return;
             closeModal();
             updateStatus("uploading", "正在更新出貨狀態...");
             try {
-                for (const row of pendingGroup.rows) {
+                let rows = [];
+                if (isBulkShip) {
+                    rows = Array.from(selectedRows);
+                } else if (pendingGroup) {
+                    rows = pendingGroup.rows;
+                }
+                for (const row of rows) {
                     await fetch(API_URL, {
                         method: "POST",
-                        body: JSON.stringify({ action: "mark_shipped", row: row, unship: false })
+                        body: JSON.stringify({ action: "mark_shipped", row, unship: false })
                     });
                 }
-                updateStatus("success", `訂單 ${pendingGroup.orderId} 已標記出貨`);
+                selectedRows.clear();
+                updateStatus("success", `已標記 ${rows.length} 筆出貨`);
                 loadOrders();
             } catch(e) {
                 updateStatus("error", "更新失敗，請重試");
             }
         }
 
-        // ── 撤銷出貨 ──
-        async function unship(...rows) {
+        async function unship(rows) {
             updateStatus("uploading", "正在撤銷出貨狀態...");
             try {
                 for (const row of rows) {
                     await fetch(API_URL, {
                         method: "POST",
-                        body: JSON.stringify({ action: "mark_shipped", row: row, unship: true })
+                        body: JSON.stringify({ action: "mark_shipped", row, unship: true })
                     });
                 }
                 updateStatus("success", "已撤銷出貨");
@@ -398,37 +577,35 @@
             }
         }
 
-        // ── 依訂單編號分組 ──
+        // ══ 依訂單編號分組 ══
         function groupByOrder(orders) {
             const map = new Map();
             orders.forEach(item => {
-                if (!map.has(item.orderId)) {
-                    map.set(item.orderId, { orderId: item.orderId, rows: [], items: [] });
-                }
+                if (!map.has(item.orderId)) map.set(item.orderId, { orderId: item.orderId, rows: [], items: [] });
                 const g = map.get(item.orderId);
                 g.rows.push(item.row);
                 g.items.push(item);
             });
-            // 最新訂單在最上面（依日期倒序）
             return Array.from(map.values()).sort((a, b) => {
-                const da = a.items[0]?.date || '';
-                const db = b.items[0]?.date || '';
+                const da = a.items[0]?.date || '', db = b.items[0]?.date || '';
                 return db.localeCompare(da);
             });
         }
 
-        // ── Tab 切換 ──
+        // ══ Tab 切換 ══
         function switchTab(tab) {
             currentTab = tab;
-            ['pending','shipped','picklist'].forEach(t => {
+            ['picklist','pending','shipped','restock'].forEach(t => {
                 document.getElementById(`page-${t}`).classList.toggle('hidden', t !== tab);
                 const btn = document.getElementById(`tab-${t}`);
-                if (btn) btn.classList.toggle('tab-active', t === tab);
-                if (btn) btn.classList.toggle('text-slate-500', t !== tab);
+                if (btn) {
+                    btn.classList.toggle('tab-active', t === tab);
+                    btn.classList.toggle('text-slate-500', t !== tab);
+                }
             });
         }
 
-        // ── 狀態列 ──
+        // ══ 狀態列 ══
         function updateStatus(type, text) {
             const bar = document.getElementById('status-bar');
             bar.className = "text-[11px] py-1 px-4 text-center font-medium flex items-center justify-center gap-1.5 transition-all border-t ";
