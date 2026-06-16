@@ -241,17 +241,19 @@ function loadShopeeImg(url, elements) {
 }
 
 function imgDiv(url, size) {
-    const sz  = size + 'px';
-    const uid = 'img_' + Math.random().toString(36).slice(2);
+    const sz = size + 'px';
     if (url && url.startsWith('http')) {
-        setTimeout(() => {
-            const el = document.getElementById(uid);
-            if (el) loadShopeeImg(url, [el]);
-        }, 0);
+        // 用 iframe 指向 GAS proxy，GAS 直接輸出 HTML 含 base64 圖片
+        const proxyUrl = `${API_URL}?action=img_proxy&url=${encodeURIComponent(url)}`;
+        return `<iframe src="${proxyUrl}"
+                    style="width:${sz};height:${sz};border:none;border-radius:8px;flex-shrink:0;background:#f8fafc;"
+                    scrolling="no"
+                    loading="lazy">
+                </iframe>`;
     }
-    const placeholder = `https://placehold.co/${size}x${size}/f1f5f9/94a3b8?text=...`;
-    return `<div id="${uid}" class="product-img-bg rounded-lg"
-                 style="width:${sz};height:${sz};flex-shrink:0;background-image:url('${placeholder}');"></div>`;
+    return `<div style="width:${sz};height:${sz};flex-shrink:0;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                <span class="material-icons" style="color:#cbd5e1;font-size:24px;">image_not_supported</span>
+            </div>`;
 }
 
 function renderAll() {
