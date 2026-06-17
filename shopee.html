@@ -274,6 +274,30 @@
             renderRestock(soldouts);
         }
 
+        // 拿貨表勾選狀態（只存在記憶體，重整清空）
+        const picklistChecked = new Set();
+
+        function togglePicklistItem(idx) {
+            if (picklistChecked.has(idx)) {
+                picklistChecked.delete(idx);
+            } else {
+                picklistChecked.add(idx);
+            }
+            const row     = document.getElementById('picklist-row-' + idx);
+            const nameEl  = document.getElementById('picklist-name-' + idx);
+            const qtyEl   = document.getElementById('picklist-qty-' + idx);
+            const checked = picklistChecked.has(idx);
+            // 刪除線
+            nameEl.style.textDecoration = checked ? 'line-through' : 'none';
+            nameEl.style.color          = checked ? '#94a3b8' : '';
+            qtyEl.style.textDecoration  = checked ? 'line-through' : 'none';
+            qtyEl.style.color           = checked ? '#94a3b8' : '';
+            // 數字區域背景切換
+            const qtyBox = document.getElementById('picklist-qtybox-' + idx);
+            qtyBox.style.background  = checked ? '#f1f5f9' : '#fff7ed';
+            qtyBox.style.borderColor = checked ? '#e2e8f0' : '#fed7aa';
+        }
+
         function renderPicklist(orders) {
             const el = document.getElementById('picklist-body');
             const totalEl = document.getElementById('picklist-total');
@@ -290,18 +314,26 @@
             });
             const sorted = Array.from(summary.values()).sort((a, b) => b.totalQty - a.totalQty);
             totalEl.textContent = sorted.length;
-            el.innerHTML = sorted.map((s, idx) => `
-                <div class="flex items-center gap-3 px-3 py-2.5">
+            el.innerHTML = sorted.map((s, idx) => {
+                const done = picklistChecked.has(idx);
+                const nameStyle = done ? 'text-decoration:line-through;color:#94a3b8;' : '';
+                const qtyStyle  = done ? 'text-decoration:line-through;color:#94a3b8;' : '';
+                const boxBg     = done ? 'background:#f1f5f9;border-color:#e2e8f0;' : 'background:#fff7ed;border-color:#fed7aa;';
+                return `
+                <div id="picklist-row-${idx}" class="flex items-center gap-3 px-3 py-2.5">
                     <div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center flex-shrink-0">${idx + 1}</div>
                     ${imgDiv(s.imgUrl, 56)}
                     <div class="flex-grow min-w-0">
-                        <div class="text-[13px] font-medium text-slate-700 leading-snug line-clamp-2">${s.name}</div>
+                        <div id="picklist-name-${idx}" class="text-[13px] font-medium leading-snug line-clamp-2" style="${nameStyle}color:${done?'#94a3b8':'#334155'}">${s.name}</div>
                     </div>
-                    <div class="flex-shrink-0 text-right">
-                        <div class="text-2xl font-bold text-orange-500">${s.totalQty}</div>
-                        <div class="text-[10px] text-slate-400">件</div>
+                    <div id="picklist-qtybox-${idx}" onclick="togglePicklistItem(${idx})"
+                        class="flex-shrink-0 text-right px-3 py-2 rounded-xl border-2 cursor-pointer active:scale-95 transition-all select-none"
+                        style="${boxBg}min-width:52px;">
+                        <div id="picklist-qty-${idx}" class="text-2xl font-bold leading-none" style="${qtyStyle}color:${done?'#94a3b8':'#f97316'}">${s.totalQty}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${done ? '✓ 完成' : '件'}</div>
                     </div>
-                </div>`).join('');
+                </div>`;
+            }).join('');
         }
 
         function renderPending(orders) {
