@@ -334,7 +334,7 @@
                     </div>
                     ${group.items.map(item => `
                         <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
-                            ${imgDiv(item.imgUrl, 48)}
+                            
                             <div class="flex-grow min-w-0">
                                 <div class="text-[12px] text-slate-500 line-clamp-2">${item.name}</div>
                                 <div class="text-xs text-slate-400">數量：<span class="font-medium text-slate-600">${item.qty}</span></div>
@@ -427,7 +427,7 @@
             document.getElementById('modal-btn-text').textContent = '確認已出貨';
             document.getElementById('modal-preview').innerHTML = group.items.map(item => `
                 <div class="flex gap-3 items-center mb-2">
-                    ${imgDiv(item.imgUrl, 48)}
+                    
                     <div class="min-w-0">
                         <div class="text-xs font-bold text-orange-600">${group.orderId}</div>
                         <div class="text-sm font-bold text-slate-800 line-clamp-1">${item.name}</div>
