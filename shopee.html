@@ -21,13 +21,6 @@
             flex-shrink:0; cursor:pointer; transition:all 0.15s;
         }
         .checkbox-custom.checked { background:#f97316; border-color:#f97316; }
-        /* 圖片用 background-image 顯示，繞過蝦皮 hotlink 保護 */
-        .product-img-bg {
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            background-color: #f8fafc;
-        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 pb-32">
@@ -81,7 +74,6 @@
 
     <main class="max-w-md mx-auto px-4 mt-3">
 
-        <!-- 拿貨表 -->
         <div id="page-picklist">
             <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
                 <div class="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 flex items-center gap-2">
@@ -101,7 +93,6 @@
             </div>
         </div>
 
-        <!-- 未出貨 -->
         <div id="page-pending" class="hidden">
             <div id="select-toolbar" class="bg-white rounded-xl border border-slate-200 p-3 mb-3 flex items-center justify-between hidden">
                 <button onclick="toggleSelectAll()" class="flex items-center gap-2 text-sm text-slate-600 font-medium active:scale-95 transition-all">
@@ -129,12 +120,10 @@
             </div>
         </div>
 
-        <!-- 已出貨 -->
         <div id="page-shipped" class="hidden">
             <div id="shipped-list" class="space-y-3"></div>
         </div>
 
-        <!-- 補貨 -->
         <div id="page-restock" class="hidden">
             <div class="bg-white rounded-xl border border-slate-200 overflow-hidden mb-4">
                 <div class="bg-gradient-to-r from-amber-500 to-orange-400 px-4 py-3 flex items-center gap-2">
@@ -152,7 +141,6 @@
 
     </main>
 
-    <!-- 出貨確認彈窗 -->
     <div id="ship-modal" class="fixed inset-0 z-50 hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;">
         <div onclick="closeModal()" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);"></div>
         <div style="position:absolute;bottom:0;left:0;right:0;" class="bg-white rounded-t-2xl p-5 max-w-md mx-auto shadow-2xl">
@@ -170,394 +158,368 @@
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbw39xPwtYMRvOFI4lGgU0gaDuCHyzC4AfwTOqVkabNw_Z-0EVtRfYpndZ-ra7Tjv9iw/exec";
 
-let allOrders    = [];
-let currentTab   = 'picklist';
-let pendingGroup = null;
-let selectedRows = new Set();
-let isBulkShip   = false;
-const imgCache   = new Map();
+        let allOrders    = [];
+        let currentTab   = 'picklist';
+        let pendingGroup = null;
+        let selectedRows = new Set();
+        let isBulkShip   = false;
 
-function getRestockStatus() {
-    try { return JSON.parse(localStorage.getItem('restock_status') || '{}'); } catch(e) { return {}; }
-}
-function saveRestockStatus(map) { localStorage.setItem('restock_status', JSON.stringify(map)); }
-
-window.addEventListener('DOMContentLoaded', loadOrders);
-
-function loadOrders() {
-    updateStatus("connecting", "正在同步蝦皮訂單資料...");
-    window._shopeeOrdersCb = function(data) {
-        document.getElementById('jsonp-shopee')?.remove();
-        if (data.error) { updateStatus("error", data.error); return; }
-        allOrders = data;
-        selectedRows.clear();
-        renderAll();
-        updateStatus("success", `已載入 ${data.length} 筆訂單資料`);
-    };
-    const s = document.createElement('script');
-    s.id  = 'jsonp-shopee';
-    s.src = `${API_URL}?action=shopee_orders&callback=_shopeeOrdersCb&_=${Date.now()}`;
-    s.onerror = () => updateStatus("error", "連線失敗，請重試");
-    document.body.appendChild(s);
-}
-
-function markShippedJSONP(row, unship) {
-    return new Promise((resolve, reject) => {
-        const cbName = '_shipCb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-        window[cbName] = function(data) {
-            document.getElementById('jsonp-ship-' + row)?.remove();
-            delete window[cbName];
-            if (data.status === 'success') resolve(data);
-            else reject(new Error(data.message || 'failed'));
-        };
-        const s = document.createElement('script');
-        s.id  = 'jsonp-ship-' + row;
-        s.src = `${API_URL}?action=mark_shipped&row=${row}&unship=${unship}&callback=${cbName}&_=${Date.now()}`;
-        s.onerror = () => { delete window[cbName]; reject(new Error('script load error')); };
-        document.body.appendChild(s);
-    });
-}
-
-// ── 圖片代理 ──
-function loadShopeeImg(url, elements) {
-    if (!url || !url.startsWith('http')) return;
-    if (imgCache.has(url)) {
-        elements.forEach(el => { if (el && el.isConnected) el.style.backgroundImage = `url('${imgCache.get(url)}')`; });
-        return;
-    }
-    const cbName = '_imgCb_' + Math.random().toString(36).slice(2);
-    window[cbName] = function(data) {
-        document.getElementById('jsonp-img-' + cbName)?.remove();
-        delete window[cbName];
-        if (data.dataUrl) {
-            imgCache.set(url, data.dataUrl);
-            elements.forEach(el => { if (el && el.isConnected) el.style.backgroundImage = `url('${data.dataUrl}')`; });
+        function getRestockStatus() {
+            try { return JSON.parse(localStorage.getItem('restock_status') || '{}'); } catch(e) { return {}; }
         }
-    };
-    const s = document.createElement('script');
-    s.id  = 'jsonp-img-' + cbName;
-    s.src = `${API_URL}?action=img_proxy&url=${encodeURIComponent(url)}&callback=${cbName}&_=${Date.now()}`;
-    document.body.appendChild(s);
-}
+        function saveRestockStatus(map) { localStorage.setItem('restock_status', JSON.stringify(map)); }
 
-function imgDiv(url, size) {
-    const sz = size + 'px';
-    if (url && url.startsWith('http')) {
-        // 用 iframe 指向 GAS proxy，GAS 直接輸出 HTML 含 base64 圖片
-        const proxyUrl = `${API_URL}?action=img_proxy&url=${encodeURIComponent(url)}`;
-        return `<iframe src="${proxyUrl}"
-                    style="width:${sz};height:${sz};border:none;border-radius:8px;flex-shrink:0;background:#f8fafc;"
-                    scrolling="no"
-                    loading="lazy">
-                </iframe>`;
-    }
-    return `<div style="width:${sz};height:${sz};flex-shrink:0;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
-                <span class="material-icons" style="color:#cbd5e1;font-size:24px;">image_not_supported</span>
-            </div>`;
-}
+        window.addEventListener('DOMContentLoaded', loadOrders);
 
-function renderAll() {
-    const pending  = allOrders.filter(o => !o.shipped && o.orderId);
-    const shipped  = allOrders.filter(o =>  o.shipped && o.orderId);
-    const soldouts = allOrders.filter(o => !o.orderId);
-    const bp = document.getElementById('badge-pending');
-    const bs = document.getElementById('badge-shipped');
-    const br = document.getElementById('badge-restock');
-    bp.textContent = pending.length;  bp.classList.toggle('hidden', pending.length  === 0);
-    bs.textContent = shipped.length;  bs.classList.toggle('hidden', shipped.length  === 0);
-    br.textContent = soldouts.length; br.classList.toggle('hidden', soldouts.length === 0);
-    renderPicklist(pending);
-    renderPending(pending);
-    renderShipped(shipped);
-    renderRestock(soldouts);
-}
+        function loadOrders() {
+            updateStatus("connecting", "正在同步訂單與圖片，請稍候...");
+            window._shopeeOrdersCb = function(data) {
+                document.getElementById('jsonp-shopee')?.remove();
+                if (data.error) { updateStatus("error", data.error); return; }
+                allOrders = data;
+                selectedRows.clear();
+                renderAll();
+                updateStatus("success", `已載入 ${data.length} 筆訂單資料`);
+            };
+            const s = document.createElement('script');
+            s.id  = 'jsonp-shopee';
+            s.src = `${API_URL}?action=shopee_orders&callback=_shopeeOrdersCb&_=${Date.now()}`;
+            s.onerror = () => updateStatus("error", "連線失敗，請重試");
+            document.body.appendChild(s);
+        }
 
-function renderPicklist(orders) {
-    const el = document.getElementById('picklist-body');
-    const totalEl = document.getElementById('picklist-total');
-    if (orders.length === 0) {
-        totalEl.textContent = '0';
-        el.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">目前無待出貨訂單</div>`;
-        return;
-    }
-    const summary = new Map();
-    orders.forEach(item => {
-        const key = item.name;
-        if (!summary.has(key)) summary.set(key, { name: item.name, imgUrl: item.imgUrl, totalQty: 0 });
-        summary.get(key).totalQty += (parseInt(item.qty) || 0);
-    });
-    const sorted = Array.from(summary.values()).sort((a, b) => b.totalQty - a.totalQty);
-    totalEl.textContent = sorted.length;
-    el.innerHTML = sorted.map((s, idx) => `
-        <div class="flex items-center gap-3 px-3 py-2.5">
-            <div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center flex-shrink-0">${idx + 1}</div>
-            ${imgDiv(s.imgUrl, 56)}
-            <div class="flex-grow min-w-0">
-                <div class="text-[13px] font-medium text-slate-700 leading-snug line-clamp-2">${s.name}</div>
-            </div>
-            <div class="flex-shrink-0 text-right">
-                <div class="text-2xl font-bold text-orange-500">${s.totalQty}</div>
-                <div class="text-[10px] text-slate-400">件</div>
-            </div>
-        </div>`).join('');
-}
+        function markShippedJSONP(row, unship) {
+            return new Promise((resolve, reject) => {
+                const cbName = '_shipCb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+                window[cbName] = function(data) {
+                    document.getElementById('jsonp-ship-' + row)?.remove();
+                    delete window[cbName];
+                    if (data.status === 'success') resolve(data);
+                    else reject(new Error(data.message || 'failed'));
+                };
+                const s = document.createElement('script');
+                s.id  = 'jsonp-ship-' + row;
+                s.src = `${API_URL}?action=mark_shipped&row=${row}&unship=${unship}&callback=${cbName}&_=${Date.now()}`;
+                s.onerror = () => { delete window[cbName]; reject(new Error('script load error')); };
+                document.body.appendChild(s);
+            });
+        }
 
-function renderPending(orders) {
-    const el      = document.getElementById('pending-list');
-    const toolbar = document.getElementById('select-toolbar');
-    if (orders.length === 0) {
-        toolbar.classList.add('hidden');
-        el.innerHTML = `
-            <div class="text-center py-10 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200">
-                <span class="material-icons text-emerald-400 text-4xl mb-2">celebration</span>
-                <div class="text-sm font-bold text-emerald-700">所有訂單皆已出貨！</div>
-            </div>`;
-        return;
-    }
-    toolbar.classList.remove('hidden');
-    el.innerHTML = '';
-    groupByOrder(orders).forEach(group => {
-        const isChecked = group.rows.every(r => selectedRows.has(r));
-        const rowsJson  = JSON.stringify(group.rows);
-        const groupJson = JSON.stringify(group).replace(/"/g, '&quot;');
-        const card = document.createElement('div');
-        card.className = 'order-card bg-white rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] overflow-hidden slide-in';
-        card.innerHTML = `
-            <div class="bg-slate-50 border-b border-slate-100 px-3 py-2 flex items-center gap-2">
-                <div class="checkbox-custom ${isChecked ? 'checked' : ''}" onclick="toggleOrderSelect(${rowsJson}, this)">
-                    <span class="material-icons text-white text-sm ${isChecked ? '' : 'hidden'}">check</span>
-                </div>
-                <span class="material-icons text-orange-400 text-sm">receipt_long</span>
-                <span class="text-xs font-bold text-slate-700 flex-grow">${group.orderId}</span>
-                <span class="text-[10px] text-slate-400">${group.items[0]?.buyer || ''}</span>
-                <span class="text-[10px] text-slate-400 ml-1">${(group.items[0]?.date || '').substring(0,10)}</span>
-            </div>
-            ${group.items.map(item => `
-                <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
+        // imgUrl 現在由 GAS 直接回傳 base64 data URL，前端直接用 <img> 顯示
+        function imgDiv(url, size) {
+            const sz = size + 'px';
+            if (url && url.startsWith('data:')) {
+                return `<div style="width:${sz};height:${sz};flex-shrink:0;border-radius:8px;overflow:hidden;background:#f8fafc;">
+                            <img src="${url}" style="width:100%;height:100%;object-fit:contain;" loading="lazy">
+                        </div>`;
+            }
+            return `<div style="width:${sz};height:${sz};flex-shrink:0;background:#f1f5f9;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                        <span class="material-icons" style="color:#cbd5e1;font-size:24px;">image_not_supported</span>
+                    </div>`;
+        }
+
+        function renderAll() {
+            const pending  = allOrders.filter(o => !o.shipped && o.orderId);
+            const shipped  = allOrders.filter(o =>  o.shipped && o.orderId);
+            const soldouts = allOrders.filter(o => !o.orderId);
+            const bp = document.getElementById('badge-pending');
+            const bs = document.getElementById('badge-shipped');
+            const br = document.getElementById('badge-restock');
+            bp.textContent = pending.length;  bp.classList.toggle('hidden', pending.length  === 0);
+            bs.textContent = shipped.length;  bs.classList.toggle('hidden', shipped.length  === 0);
+            br.textContent = soldouts.length; br.classList.toggle('hidden', soldouts.length === 0);
+            renderPicklist(pending);
+            renderPending(pending);
+            renderShipped(shipped);
+            renderRestock(soldouts);
+        }
+
+        function renderPicklist(orders) {
+            const el = document.getElementById('picklist-body');
+            const totalEl = document.getElementById('picklist-total');
+            if (orders.length === 0) {
+                totalEl.textContent = '0';
+                el.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">目前無待出貨訂單</div>`;
+                return;
+            }
+            const summary = new Map();
+            orders.forEach(item => {
+                const key = item.name;
+                if (!summary.has(key)) summary.set(key, { name: item.name, imgUrl: item.imgUrl, totalQty: 0 });
+                summary.get(key).totalQty += (parseInt(item.qty) || 0);
+            });
+            const sorted = Array.from(summary.values()).sort((a, b) => b.totalQty - a.totalQty);
+            totalEl.textContent = sorted.length;
+            el.innerHTML = sorted.map((s, idx) => `
+                <div class="flex items-center gap-3 px-3 py-2.5">
+                    <div class="w-8 h-8 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center flex-shrink-0">${idx + 1}</div>
+                    ${imgDiv(s.imgUrl, 56)}
+                    <div class="flex-grow min-w-0">
+                        <div class="text-[13px] font-medium text-slate-700 leading-snug line-clamp-2">${s.name}</div>
+                    </div>
+                    <div class="flex-shrink-0 text-right">
+                        <div class="text-2xl font-bold text-orange-500">${s.totalQty}</div>
+                        <div class="text-[10px] text-slate-400">件</div>
+                    </div>
+                </div>`).join('');
+        }
+
+        function renderPending(orders) {
+            const el      = document.getElementById('pending-list');
+            const toolbar = document.getElementById('select-toolbar');
+            if (orders.length === 0) {
+                toolbar.classList.add('hidden');
+                el.innerHTML = `
+                    <div class="text-center py-10 bg-emerald-50/50 rounded-xl border border-dashed border-emerald-200">
+                        <span class="material-icons text-emerald-400 text-4xl mb-2">celebration</span>
+                        <div class="text-sm font-bold text-emerald-700">所有訂單皆已出貨！</div>
+                    </div>`;
+                return;
+            }
+            toolbar.classList.remove('hidden');
+            el.innerHTML = '';
+            groupByOrder(orders).forEach(group => {
+                const isChecked = group.rows.every(r => selectedRows.has(r));
+                const rowsJson  = JSON.stringify(group.rows);
+                const groupJson = JSON.stringify(group).replace(/"/g, '&quot;');
+                const card = document.createElement('div');
+                card.className = 'order-card bg-white rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] overflow-hidden slide-in';
+                card.innerHTML = `
+                    <div class="bg-slate-50 border-b border-slate-100 px-3 py-2 flex items-center gap-2">
+                        <div class="checkbox-custom ${isChecked ? 'checked' : ''}" onclick="toggleOrderSelect(${rowsJson}, this)">
+                            <span class="material-icons text-white text-sm ${isChecked ? '' : 'hidden'}">check</span>
+                        </div>
+                        <span class="material-icons text-orange-400 text-sm">receipt_long</span>
+                        <span class="text-xs font-bold text-slate-700 flex-grow">${group.orderId}</span>
+                        <span class="text-[10px] text-slate-400">${group.items[0]?.buyer || ''}</span>
+                        <span class="text-[10px] text-slate-400 ml-1">${(group.items[0]?.date || '').substring(0,10)}</span>
+                    </div>
+                    ${group.items.map(item => `
+                        <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
+                            ${imgDiv(item.imgUrl, 56)}
+                            <div class="flex-grow min-w-0">
+                                <div class="text-[13px] font-medium text-slate-800 leading-snug line-clamp-2">${item.name}</div>
+                                <div class="text-xs text-slate-400 mt-0.5">數量：<span class="font-bold text-slate-700 text-sm">${item.qty}</span></div>
+                            </div>
+                        </div>`).join('')}
+                    <div class="px-3 py-2 bg-slate-50/50">
+                        <button onclick='openShipModal(${groupJson})'
+                            class="w-full bg-orange-500 text-white text-sm font-bold py-2 rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+                            <span class="material-icons text-base">local_shipping</span>標記已出貨
+                        </button>
+                    </div>`;
+                el.appendChild(card);
+            });
+            updateSelectUI();
+        }
+
+        function renderShipped(orders) {
+            const el = document.getElementById('shipped-list');
+            if (orders.length === 0) {
+                el.innerHTML = `<div class="text-center py-10 text-slate-400 text-xs">尚無已出貨訂單</div>`;
+                return;
+            }
+            el.innerHTML = '';
+            groupByOrder(orders).forEach(group => {
+                const card = document.createElement('div');
+                card.className = 'order-card bg-white rounded-xl border border-emerald-100 overflow-hidden slide-in opacity-80';
+                card.innerHTML = `
+                    <div class="bg-emerald-50 border-b border-emerald-100 px-3 py-2 flex items-center justify-between">
+                        <div class="flex items-center gap-1.5">
+                            <span class="material-icons text-emerald-500 text-sm">check_circle</span>
+                            <span class="text-xs font-bold text-slate-700">${group.orderId}</span>
+                            <span class="text-[10px] text-slate-400">${group.items[0]?.buyer || ''}</span>
+                        </div>
+                        <div class="text-[10px] text-emerald-600 font-medium">出貨 ${(group.items[0]?.shippedAt || '').substring(0,10)}</div>
+                    </div>
+                    ${group.items.map(item => `
+                        <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
+                            ${imgDiv(item.imgUrl, 48)}
+                            <div class="flex-grow min-w-0">
+                                <div class="text-[12px] text-slate-500 line-clamp-2">${item.name}</div>
+                                <div class="text-xs text-slate-400">數量：<span class="font-medium text-slate-600">${item.qty}</span></div>
+                            </div>
+                        </div>`).join('')}
+                    <div class="px-3 py-2">
+                        <button onclick="unship(${JSON.stringify(group.rows)})"
+                            class="w-full border border-slate-200 text-slate-500 text-xs font-medium py-1.5 rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all">
+                            <span class="material-icons text-sm">undo</span>撤銷出貨
+                        </button>
+                    </div>`;
+                el.appendChild(card);
+            });
+        }
+
+        function renderRestock(soldouts) {
+            const el     = document.getElementById('restock-body');
+            const status = getRestockStatus();
+            if (soldouts.length === 0) {
+                el.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">目前無已售完商品通知</div>`;
+                return;
+            }
+            el.innerHTML = soldouts.map((item) => {
+                const key = item.name + '_' + item.row;
+                const cur = status[key] || 'pending';
+                return `
+                <div class="flex items-center gap-3 px-3 py-3">
                     ${imgDiv(item.imgUrl, 56)}
                     <div class="flex-grow min-w-0">
-                        <div class="text-[13px] font-medium text-slate-800 leading-snug line-clamp-2">${item.name}</div>
-                        <div class="text-xs text-slate-400 mt-0.5">數量：<span class="font-bold text-slate-700 text-sm">${item.qty}</span></div>
+                        <div class="text-[13px] font-medium text-slate-700 leading-snug line-clamp-2">${item.name}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${item.date || ''}</div>
                     </div>
-                </div>`).join('')}
-            <div class="px-3 py-2 bg-slate-50/50">
-                <button onclick='openShipModal(${groupJson})'
-                    class="w-full bg-orange-500 text-white text-sm font-bold py-2 rounded-lg flex items-center justify-center gap-1.5 active:scale-95 transition-all">
-                    <span class="material-icons text-base">local_shipping</span>標記已出貨
-                </button>
-            </div>`;
-        el.appendChild(card);
-    });
-    updateSelectUI();
-}
+                    <div class="flex flex-col gap-1 flex-shrink-0">
+                        <button onclick="setRestock('${key}', 'restocked')"
+                            class="text-[11px] px-2.5 py-1 rounded-lg font-bold border flex items-center gap-0.5 active:scale-95 ${cur === 'restocked' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}">
+                            <span class="material-icons text-xs">check_circle</span>已補貨
+                        </button>
+                        <button onclick="setRestock('${key}', 'shortage')"
+                            class="text-[11px] px-2.5 py-1 rounded-lg font-bold border flex items-center gap-0.5 active:scale-95 ${cur === 'shortage' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-500 border-slate-200'}">
+                            <span class="material-icons text-xs">remove_circle</span>缺貨
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
 
-function renderShipped(orders) {
-    const el = document.getElementById('shipped-list');
-    if (orders.length === 0) {
-        el.innerHTML = `<div class="text-center py-10 text-slate-400 text-xs">尚無已出貨訂單</div>`;
-        return;
-    }
-    el.innerHTML = '';
-    groupByOrder(orders).forEach(group => {
-        const card = document.createElement('div');
-        card.className = 'order-card bg-white rounded-xl border border-emerald-100 overflow-hidden slide-in opacity-80';
-        card.innerHTML = `
-            <div class="bg-emerald-50 border-b border-emerald-100 px-3 py-2 flex items-center justify-between">
-                <div class="flex items-center gap-1.5">
-                    <span class="material-icons text-emerald-500 text-sm">check_circle</span>
-                    <span class="text-xs font-bold text-slate-700">${group.orderId}</span>
-                    <span class="text-[10px] text-slate-400">${group.items[0]?.buyer || ''}</span>
-                </div>
-                <div class="text-[10px] text-emerald-600 font-medium">出貨 ${(group.items[0]?.shippedAt || '').substring(0,10)}</div>
-            </div>
-            ${group.items.map(item => `
-                <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
+        function setRestock(key, newStatus) {
+            const map = getRestockStatus();
+            map[key]  = map[key] === newStatus ? 'pending' : newStatus;
+            saveRestockStatus(map);
+            renderRestock(allOrders.filter(o => !o.orderId));
+        }
+
+        function toggleOrderSelect(rows, boxEl) {
+            const allChecked = rows.every(r => selectedRows.has(r));
+            rows.forEach(r => allChecked ? selectedRows.delete(r) : selectedRows.add(r));
+            const isNow = rows.every(r => selectedRows.has(r));
+            boxEl.classList.toggle('checked', isNow);
+            const chk = boxEl.querySelector('.material-icons');
+            if (chk) chk.classList.toggle('hidden', !isNow);
+            updateSelectUI();
+        }
+
+        function toggleSelectAll() {
+            const pending = allOrders.filter(o => !o.shipped && o.orderId);
+            const allRows = pending.map(o => o.row);
+            const allSel  = allRows.every(r => selectedRows.has(r));
+            allRows.forEach(r => allSel ? selectedRows.delete(r) : selectedRows.add(r));
+            renderPending(pending);
+        }
+
+        function updateSelectUI() {
+            const pending    = allOrders.filter(o => !o.shipped && o.orderId);
+            const allRows    = pending.map(o => o.row);
+            const allChecked = allRows.length > 0 && allRows.every(r => selectedRows.has(r));
+            const count      = selectedRows.size;
+            const box   = document.getElementById('select-all-box');
+            const chk   = document.getElementById('select-all-check');
+            const btn   = document.getElementById('btn-ship-selected');
+            const cntEl = document.getElementById('selected-count');
+            if (box)   box.classList.toggle('checked', allChecked);
+            if (chk)   chk.classList.toggle('hidden', !allChecked);
+            if (btn)   { btn.disabled = count === 0; btn.classList.toggle('opacity-40', count === 0); }
+            if (cntEl) cntEl.textContent = count;
+        }
+
+        function openShipModal(group) {
+            isBulkShip   = false;
+            pendingGroup = group;
+            document.getElementById('modal-btn-text').textContent = '確認已出貨';
+            document.getElementById('modal-preview').innerHTML = group.items.map(item => `
+                <div class="flex gap-3 items-center mb-2">
                     ${imgDiv(item.imgUrl, 48)}
-                    <div class="flex-grow min-w-0">
-                        <div class="text-[12px] text-slate-500 line-clamp-2">${item.name}</div>
-                        <div class="text-xs text-slate-400">數量：<span class="font-medium text-slate-600">${item.qty}</span></div>
+                    <div class="min-w-0">
+                        <div class="text-xs font-bold text-orange-600">${group.orderId}</div>
+                        <div class="text-sm font-bold text-slate-800 line-clamp-1">${item.name}</div>
+                        <div class="text-xs text-slate-400">數量：${item.qty}</div>
                     </div>
-                </div>`).join('')}
-            <div class="px-3 py-2">
-                <button onclick="unship(${JSON.stringify(group.rows)})"
-                    class="w-full border border-slate-200 text-slate-500 text-xs font-medium py-1.5 rounded-lg flex items-center justify-center gap-1 active:scale-95 transition-all">
-                    <span class="material-icons text-sm">undo</span>撤銷出貨
-                </button>
-            </div>`;
-        el.appendChild(card);
-    });
-}
+                </div>`).join('');
+            document.getElementById('ship-modal').classList.remove('hidden');
+        }
 
-function renderRestock(soldouts) {
-    const el     = document.getElementById('restock-body');
-    const status = getRestockStatus();
-    if (soldouts.length === 0) {
-        el.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">目前無已售完商品通知</div>`;
-        return;
-    }
-    el.innerHTML = soldouts.map((item) => {
-        const key = item.name + '_' + item.row;
-        const cur = status[key] || 'pending';
-        return `
-        <div class="flex items-center gap-3 px-3 py-3">
-            ${imgDiv(item.imgUrl, 56)}
-            <div class="flex-grow min-w-0">
-                <div class="text-[13px] font-medium text-slate-700 leading-snug line-clamp-2">${item.name}</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">${item.date || ''}</div>
-            </div>
-            <div class="flex flex-col gap-1 flex-shrink-0">
-                <button onclick="setRestock('${key}', 'restocked')"
-                    class="text-[11px] px-2.5 py-1 rounded-lg font-bold border flex items-center gap-0.5 active:scale-95 ${cur === 'restocked' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}">
-                    <span class="material-icons text-xs">check_circle</span>已補貨
-                </button>
-                <button onclick="setRestock('${key}', 'shortage')"
-                    class="text-[11px] px-2.5 py-1 rounded-lg font-bold border flex items-center gap-0.5 active:scale-95 ${cur === 'shortage' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-slate-500 border-slate-200'}">
-                    <span class="material-icons text-xs">remove_circle</span>缺貨
-                </button>
-            </div>
-        </div>`;
-    }).join('');
-}
+        function shipSelected() {
+            if (selectedRows.size === 0) return;
+            isBulkShip   = true;
+            pendingGroup = null;
+            const count  = selectedRows.size;
+            document.getElementById('modal-btn-text').textContent = `確認出貨 ${count} 筆訂單`;
+            document.getElementById('modal-preview').innerHTML = `
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                        <span class="material-icons text-orange-500 text-2xl">local_shipping</span>
+                    </div>
+                    <div>
+                        <div class="text-sm font-bold text-slate-800">批次出貨</div>
+                        <div class="text-xs text-slate-500">共 ${count} 筆訂單將標記為已出貨</div>
+                    </div>
+                </div>`;
+            document.getElementById('ship-modal').classList.remove('hidden');
+        }
 
-function setRestock(key, newStatus) {
-    const map = getRestockStatus();
-    map[key]  = map[key] === newStatus ? 'pending' : newStatus;
-    saveRestockStatus(map);
-    renderRestock(allOrders.filter(o => !o.orderId));
-}
+        function closeModal() { document.getElementById('ship-modal').classList.add('hidden'); }
 
-function toggleOrderSelect(rows, boxEl) {
-    const allChecked = rows.every(r => selectedRows.has(r));
-    rows.forEach(r => allChecked ? selectedRows.delete(r) : selectedRows.add(r));
-    const isNow = rows.every(r => selectedRows.has(r));
-    boxEl.classList.toggle('checked', isNow);
-    const chk = boxEl.querySelector('.material-icons');
-    if (chk) chk.classList.toggle('hidden', !isNow);
-    updateSelectUI();
-}
+        async function confirmShip() {
+            closeModal();
+            const rows = isBulkShip ? Array.from(selectedRows) : (pendingGroup?.rows || []);
+            if (rows.length === 0) return;
+            updateStatus("uploading", `正在標記 ${rows.length} 筆出貨...`);
+            try {
+                for (const row of rows) await markShippedJSONP(row, false);
+                selectedRows.clear();
+                updateStatus("success", `已成功標記 ${rows.length} 筆出貨！`);
+                loadOrders();
+            } catch(e) {
+                updateStatus("error", "標記失敗，請重試");
+            }
+        }
 
-function toggleSelectAll() {
-    const pending = allOrders.filter(o => !o.shipped && o.orderId);
-    const allRows = pending.map(o => o.row);
-    const allSel  = allRows.every(r => selectedRows.has(r));
-    allRows.forEach(r => allSel ? selectedRows.delete(r) : selectedRows.add(r));
-    renderPending(pending);
-}
+        async function unship(rows) {
+            updateStatus("uploading", "正在撤銷出貨狀態...");
+            try {
+                for (const row of rows) await markShippedJSONP(row, true);
+                updateStatus("success", "已撤銷出貨");
+                loadOrders();
+            } catch(e) {
+                updateStatus("error", "撤銷失敗，請重試");
+            }
+        }
 
-function updateSelectUI() {
-    const pending    = allOrders.filter(o => !o.shipped && o.orderId);
-    const allRows    = pending.map(o => o.row);
-    const allChecked = allRows.length > 0 && allRows.every(r => selectedRows.has(r));
-    const count      = selectedRows.size;
-    const box   = document.getElementById('select-all-box');
-    const chk   = document.getElementById('select-all-check');
-    const btn   = document.getElementById('btn-ship-selected');
-    const cntEl = document.getElementById('selected-count');
-    if (box)   box.classList.toggle('checked', allChecked);
-    if (chk)   chk.classList.toggle('hidden', !allChecked);
-    if (btn)   { btn.disabled = count === 0; btn.classList.toggle('opacity-40', count === 0); }
-    if (cntEl) cntEl.textContent = count;
-}
+        function groupByOrder(orders) {
+            const map = new Map();
+            orders.forEach(item => {
+                if (!map.has(item.orderId)) map.set(item.orderId, { orderId: item.orderId, rows: [], items: [] });
+                const g = map.get(item.orderId);
+                g.rows.push(item.row);
+                g.items.push(item);
+            });
+            return Array.from(map.values()).sort((a, b) =>
+                (b.items[0]?.date || '').localeCompare(a.items[0]?.date || ''));
+        }
 
-function openShipModal(group) {
-    isBulkShip   = false;
-    pendingGroup = group;
-    document.getElementById('modal-btn-text').textContent = '確認已出貨';
-    document.getElementById('modal-preview').innerHTML = group.items.map(item => `
-        <div class="flex gap-3 items-center mb-2">
-            ${imgDiv(item.imgUrl, 48)}
-            <div class="min-w-0">
-                <div class="text-xs font-bold text-orange-600">${group.orderId}</div>
-                <div class="text-sm font-bold text-slate-800 line-clamp-1">${item.name}</div>
-                <div class="text-xs text-slate-400">數量：${item.qty}</div>
-            </div>
-        </div>`).join('');
-    document.getElementById('ship-modal').classList.remove('hidden');
-}
+        function switchTab(tab) {
+            currentTab = tab;
+            ['picklist','pending','shipped','restock'].forEach(t => {
+                document.getElementById(`page-${t}`).classList.toggle('hidden', t !== tab);
+                const btn = document.getElementById(`tab-${t}`);
+                if (btn) { btn.classList.toggle('tab-active', t === tab); btn.classList.toggle('text-slate-500', t !== tab); }
+            });
+        }
 
-function shipSelected() {
-    if (selectedRows.size === 0) return;
-    isBulkShip   = true;
-    pendingGroup = null;
-    const count  = selectedRows.size;
-    document.getElementById('modal-btn-text').textContent = `確認出貨 ${count} 筆訂單`;
-    document.getElementById('modal-preview').innerHTML = `
-        <div class="flex items-center gap-3 mb-2">
-            <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
-                <span class="material-icons text-orange-500 text-2xl">local_shipping</span>
-            </div>
-            <div>
-                <div class="text-sm font-bold text-slate-800">批次出貨</div>
-                <div class="text-xs text-slate-500">共 ${count} 筆訂單將標記為已出貨</div>
-            </div>
-        </div>`;
-    document.getElementById('ship-modal').classList.remove('hidden');
-}
-
-function closeModal() { document.getElementById('ship-modal').classList.add('hidden'); }
-
-async function confirmShip() {
-    closeModal();
-    const rows = isBulkShip ? Array.from(selectedRows) : (pendingGroup?.rows || []);
-    if (rows.length === 0) return;
-    updateStatus("uploading", `正在標記 ${rows.length} 筆出貨...`);
-    try {
-        for (const row of rows) await markShippedJSONP(row, false);
-        selectedRows.clear();
-        updateStatus("success", `已成功標記 ${rows.length} 筆出貨！`);
-        loadOrders();
-    } catch(e) {
-        updateStatus("error", "標記失敗，請重試");
-    }
-}
-
-async function unship(rows) {
-    updateStatus("uploading", "正在撤銷出貨狀態...");
-    try {
-        for (const row of rows) await markShippedJSONP(row, true);
-        updateStatus("success", "已撤銷出貨");
-        loadOrders();
-    } catch(e) {
-        updateStatus("error", "撤銷失敗，請重試");
-    }
-}
-
-function groupByOrder(orders) {
-    const map = new Map();
-    orders.forEach(item => {
-        if (!map.has(item.orderId)) map.set(item.orderId, { orderId: item.orderId, rows: [], items: [] });
-        const g = map.get(item.orderId);
-        g.rows.push(item.row);
-        g.items.push(item);
-    });
-    return Array.from(map.values()).sort((a, b) =>
-        (b.items[0]?.date || '').localeCompare(a.items[0]?.date || ''));
-}
-
-function switchTab(tab) {
-    currentTab = tab;
-    ['picklist','pending','shipped','restock'].forEach(t => {
-        document.getElementById(`page-${t}`).classList.toggle('hidden', t !== tab);
-        const btn = document.getElementById(`tab-${t}`);
-        if (btn) { btn.classList.toggle('tab-active', t === tab); btn.classList.toggle('text-slate-500', t !== tab); }
-    });
-}
-
-function updateStatus(type, text) {
-    const bar = document.getElementById('status-bar');
-    bar.className = "text-[11px] py-1 px-4 text-center font-medium flex items-center justify-center gap-1.5 transition-all border-t ";
-    if (type === "connecting" || type === "uploading") {
-        bar.classList.add("bg-amber-50","border-amber-100","text-amber-700");
-        bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span><span>${text}</span>`;
-    } else if (type === "success") {
-        bar.classList.add("bg-emerald-50","border-emerald-100","text-emerald-700");
-        bar.innerHTML = `<span class="material-icons text-xs text-emerald-500">check_circle</span><span>${text}</span>`;
-        setTimeout(() => { bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>系統就緒</span>`; }, 3000);
-    } else if (type === "error") {
-        bar.classList.add("bg-rose-50","border-rose-100","text-rose-700");
-        bar.innerHTML = `<span class="material-icons text-xs text-rose-500">error</span><span class="font-bold">${text}</span>`;
-    }
-}
+        function updateStatus(type, text) {
+            const bar = document.getElementById('status-bar');
+            bar.className = "text-[11px] py-1 px-4 text-center font-medium flex items-center justify-center gap-1.5 transition-all border-t ";
+            if (type === "connecting" || type === "uploading") {
+                bar.classList.add("bg-amber-50","border-amber-100","text-amber-700");
+                bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span><span>${text}</span>`;
+            } else if (type === "success") {
+                bar.classList.add("bg-emerald-50","border-emerald-100","text-emerald-700");
+                bar.innerHTML = `<span class="material-icons text-xs text-emerald-500">check_circle</span><span>${text}</span>`;
+                setTimeout(() => { bar.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>系統就緒</span>`; }, 3000);
+            } else if (type === "error") {
+                bar.classList.add("bg-rose-50","border-rose-100","text-rose-700");
+                bar.innerHTML = `<span class="material-icons text-xs text-rose-500">error</span><span class="font-bold">${text}</span>`;
+            }
+        }
     </script>
 </body>
 </html>
