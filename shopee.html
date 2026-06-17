@@ -15,6 +15,7 @@
         .order-card:active { transform: scale(0.985); }
         .slide-in { animation: slideIn 0.2s ease-out; }
         @keyframes slideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .checkbox-custom {
             width:20px; height:20px; border-radius:6px; border:2px solid #cbd5e1;
             background:white; display:flex; align-items:center; justify-content:center;
@@ -24,6 +25,16 @@
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 pb-32">
+
+<!-- Loading 畫面 -->
+<div id="loading-screen" style="position:fixed;top:0;left:0;right:0;bottom:0;background:#f8fafc;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+    <div style="width:48px;height:48px;border:4px solid #fed7aa;border-top-color:#f97316;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+    <div style="text-align:center;">
+        <div style="font-size:14px;font-weight:700;color:#1e293b;font-family:sans-serif;">蝦皮訂單管理</div>
+        <div id="loading-msg" style="font-size:12px;color:#94a3b8;margin-top:4px;font-family:sans-serif;">正在載入訂單與圖片...</div>
+    </div>
+    <div id="loading-timeout-msg" style="font-size:11px;color:#f97316;font-family:sans-serif;display:none;">載入時間較長，圖片數量較多請稍候</div>
+</div>
 
     <header class="bg-white/80 blur-bg border-b border-slate-200/80 sticky top-0 z-50 shadow-sm">
         <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
@@ -164,6 +175,11 @@
         let selectedRows = new Set();
         let isBulkShip   = false;
 
+        function hideLoading() {
+            const ls = document.getElementById('loading-screen');
+            if (ls) ls.style.display = 'none';
+        }
+
         function getRestockStatus() {
             try { return JSON.parse(localStorage.getItem('restock_status') || '{}'); } catch(e) { return {}; }
         }
@@ -172,19 +188,44 @@
         window.addEventListener('DOMContentLoaded', loadOrders);
 
         function loadOrders() {
+            // 每次重新整理也要顯示 loading
+            const ls = document.getElementById('loading-screen');
+            if (ls) {
+                ls.style.display = 'flex';
+                document.getElementById('loading-msg').textContent = '正在載入訂單與圖片...';
+                document.getElementById('loading-timeout-msg').style.display = 'none';
+            }
+
             updateStatus("connecting", "正在同步訂單與圖片，請稍候...");
+
+            // 8秒後顯示「圖片較多請稍候」提示
+            const timeoutHint = setTimeout(function() {
+                const ls = document.getElementById('loading-screen');
+                if (ls && ls.style.display !== 'none') {
+                    document.getElementById('loading-timeout-msg').style.display = 'block';
+                    document.getElementById('loading-msg').textContent = '圖片載入中，請耐心等候...';
+                }
+            }, 8000);
+
             window._shopeeOrdersCb = function(data) {
+                clearTimeout(timeoutHint);
                 document.getElementById('jsonp-shopee')?.remove();
+                hideLoading();
                 if (data.error) { updateStatus("error", data.error); return; }
                 allOrders = data;
                 selectedRows.clear();
                 renderAll();
                 updateStatus("success", `已載入 ${data.length} 筆訂單資料`);
             };
+
             const s = document.createElement('script');
             s.id  = 'jsonp-shopee';
             s.src = `${API_URL}?action=shopee_orders&callback=_shopeeOrdersCb&_=${Date.now()}`;
-            s.onerror = () => updateStatus("error", "連線失敗，請重試");
+            s.onerror = () => {
+                clearTimeout(timeoutHint);
+                hideLoading();
+                updateStatus("error", "連線失敗，請重試");
+            };
             document.body.appendChild(s);
         }
 
@@ -205,7 +246,6 @@
             });
         }
 
-        // imgUrl 現在由 GAS 直接回傳 base64 data URL，前端直接用 <img> 顯示
         function imgDiv(url, size) {
             const sz = size + 'px';
             if (url && url.startsWith('data:')) {
@@ -334,7 +374,6 @@
                     </div>
                     ${group.items.map(item => `
                         <div class="flex items-center gap-3 px-3 py-2.5 border-b border-slate-50 last:border-0">
-                            
                             <div class="flex-grow min-w-0">
                                 <div class="text-[12px] text-slate-500 line-clamp-2">${item.name}</div>
                                 <div class="text-xs text-slate-400">數量：<span class="font-medium text-slate-600">${item.qty}</span></div>
@@ -427,7 +466,7 @@
             document.getElementById('modal-btn-text').textContent = '確認已出貨';
             document.getElementById('modal-preview').innerHTML = group.items.map(item => `
                 <div class="flex gap-3 items-center mb-2">
-                    
+                    ${imgDiv(item.imgUrl, 48)}
                     <div class="min-w-0">
                         <div class="text-xs font-bold text-orange-600">${group.orderId}</div>
                         <div class="text-sm font-bold text-slate-800 line-clamp-1">${item.name}</div>
