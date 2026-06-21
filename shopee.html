@@ -326,9 +326,10 @@
         }
         const summary = new Map();
         orders.forEach(item => {
-            const key = item.name;
-            if (!summary.has(key)) summary.set(key, { name: item.name, imgUrl: item.imgUrl, totalQty: 0 });
-            summary.get(key).totalQty += (parseInt(item.qty) || 0);
+            // 用商品名稱（｜前面）作為彙總 key，不同選項的同商品合併計算
+            const { name: baseName } = splitNameOption(item.name);
+            if (!summary.has(baseName)) summary.set(baseName, { name: baseName, imgUrl: item.imgUrl, totalQty: 0 });
+            summary.get(baseName).totalQty += (parseInt(item.qty) || 0);
         });
         const sorted = Array.from(summary.values()).sort((a, b) => b.totalQty - a.totalQty);
         totalEl.textContent = sorted.length;
