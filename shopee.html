@@ -350,7 +350,7 @@
                     </div>
                 </div>
                 <div id="picklist-qtybox-${idx}" onclick="togglePicklistItem(${idx})"
-                    class="flex-shrink-0 text-right px-3 py-2 rounded-xl border-2 cursor-pointer active:scale-95 transition-all select-none mt-0.5"
+                    class="flex-shrink-0 text-center px-3 py-2 rounded-xl border-2 cursor-pointer active:scale-95 transition-all select-none mt-0.5"
                     style="${boxBg}min-width:52px;">
                     <div id="picklist-qty-${idx}" class="text-2xl font-bold leading-none" style="${qtyStyle}color:${done?'#94a3b8':'#f97316'}">${s.totalQty}</div>
                     <div class="text-[10px] text-slate-400 mt-0.5">${done ? '✓ 完成' : '件'}</div>
@@ -398,9 +398,12 @@
                         <div class="flex-grow min-w-0">
                             <div class="text-[13px] font-medium text-slate-800 leading-snug">${dName}</div>
                             ${dOption ? `<div class="text-[12px] font-semibold text-orange-500 mt-0.5">${dOption}</div>` : ''}
-                            <div class="text-xs text-slate-400 mt-0.5">數量：<span class="font-bold text-slate-700 text-sm">${item.qty}</span></div>
                         </div>
-                    </div>`;
+                        <div class="flex-shrink-0 text-center px-3 py-2 rounded-xl border-2 ml-1" style="background:#fff7ed;border-color:#fed7aa;min-width:52px;">
+                            <div class="text-2xl font-bold leading-none text-orange-500">${item.qty}</div>
+                            <div class="text-[10px] text-slate-400 mt-0.5">件</div>
+                        </div>
+                    </div>`
                 }).join('')}
                 <div class="px-3 py-2 bg-slate-50/50">
                     <button onclick='openShipModal(${groupJson})'
