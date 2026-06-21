@@ -478,8 +478,8 @@
                     <div class="text-[10px] text-slate-400 mt-0.5">${item.date || ''}</div>
                 </div>
                 <div class="flex flex-col gap-1 flex-shrink-0">
-                    <button onclick="setRestock('${key}', 'restocked')"
-                        class="text-[11px] px-2.5 py-1 rounded-lg font-bold border flex items-center gap-0.5 active:scale-95 ${cur === 'restocked' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-500 border-slate-200'}">
+                    <button onclick="deleteRestockRow(${item.row})"
+                        class="text-[11px] px-2.5 py-1 rounded-lg font-bold border flex items-center gap-0.5 active:scale-95 bg-emerald-500 text-white border-emerald-500">
                         <span class="material-icons text-xs">check_circle</span>已補貨
                     </button>
                     <button onclick="setRestock('${key}', 'shortage')"
@@ -496,6 +496,28 @@
         map[key]  = map[key] === newStatus ? 'pending' : newStatus;
         saveRestockStatus(map);
         renderRestock(allOrders.filter(o => !o.orderId));
+    }
+
+    function deleteRestockRow(row) {
+        updateStatus("uploading", "正在刪除已售完通知...");
+        const cbName = '_delCb_' + Date.now();
+        window[cbName] = function(data) {
+            document.getElementById('jsonp-del-' + row)?.remove();
+            delete window[cbName];
+            if (data.status === 'success') {
+                // 從 allOrders 移除該列，重新渲染
+                allOrders = allOrders.filter(o => o.row !== row);
+                renderRestock(allOrders.filter(o => !o.orderId));
+                updateStatus("success", "已刪除，下次匯入不會再顯示");
+            } else {
+                updateStatus("error", "刪除失敗：" + (data.message || '未知錯誤'));
+            }
+        };
+        const s = document.createElement('script');
+        s.id  = 'jsonp-del-' + row;
+        s.src = `${API_URL}?action=delete_row&row=${row}&callback=${cbName}&_=${Date.now()}`;
+        s.onerror = () => { delete window[cbName]; updateStatus("error", "刪除失敗，請重試"); };
+        document.body.appendChild(s);
     }
 
     function toggleOrderSelect(rows, boxEl) {
