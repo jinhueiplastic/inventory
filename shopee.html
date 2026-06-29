@@ -259,7 +259,8 @@
         const bp = document.getElementById('badge-pending');
         const bs = document.getElementById('badge-shipped');
         const br = document.getElementById('badge-restock');
-        bp.textContent = pending.length;  bp.classList.toggle('hidden', pending.length  === 0);
+        const pendingOrderCount = new Set(pending.map(o => o.orderId)).size;
+        bp.textContent = pendingOrderCount;  bp.classList.toggle('hidden', pendingOrderCount === 0);
         bs.textContent = shipped.length;  bs.classList.toggle('hidden', shipped.length  === 0);
         br.textContent = soldouts.length; br.classList.toggle('hidden', soldouts.length === 0);
         renderPicklist(pending);
