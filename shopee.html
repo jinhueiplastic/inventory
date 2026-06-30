@@ -481,11 +481,18 @@
         renderPending(pending);
     }
 
+    // 計算 selectedRows 對應多少張「不重複」訂單（一張訂單可能含多列商品）
+    function countSelectedOrders() {
+        const orderIds = new Set();
+        allOrders.forEach(o => { if (selectedRows.has(o.row)) orderIds.add(o.orderId); });
+        return orderIds.size;
+    }
+
     function updateSelectUI() {
         const pending    = allOrders.filter(o => !o.shipped && o.orderId);
         const allRows    = pending.map(o => o.row);
         const allChecked = allRows.length > 0 && allRows.every(r => selectedRows.has(r));
-        const count      = selectedRows.size;
+        const count      = countSelectedOrders();
         const box = document.getElementById('select-all-box'), chk = document.getElementById('select-all-check');
         const btn = document.getElementById('btn-ship-selected'), cntEl = document.getElementById('selected-count');
         if (box) box.classList.toggle('checked', allChecked);
@@ -515,7 +522,7 @@
     function shipSelected() {
         if (selectedRows.size === 0) return;
         isBulkShip = true; pendingGroup = null;
-        const count = selectedRows.size;
+        const count = countSelectedOrders();
         document.getElementById('modal-btn-text').textContent = `確認出貨 ${count} 筆訂單`;
         document.getElementById('modal-preview').innerHTML = `
             <div class="flex items-center gap-3 mb-2">
