@@ -638,7 +638,18 @@
     async function deleteRestockRow(row) {
         updateStatus("uploading", "正在刪除已售完通知...");
         try {
+            // 刪除 Supabase
             await sbFetch(`shopee_orders?sheet_row=eq.${row}`, { method: "DELETE" });
+
+            // 同步刪除 Google Sheet（背景執行）
+            const cbName = '_delCb_' + Date.now();
+            window[cbName] = () => { document.getElementById('gs-del-' + row)?.remove(); delete window[cbName]; };
+            const s = document.createElement('script');
+            s.id  = 'gs-del-' + row;
+            s.src = `${GAS_URL}?action=delete_row&row=${row}&callback=${cbName}&_=${Date.now()}`;
+            document.body.appendChild(s);
+
+            // 前端移除
             allOrders = allOrders.filter(o => o.row !== row);
             renderRestock(allOrders.filter(o => !o.orderId || o.soldOut === '是'));
             const br = document.getElementById('badge-restock');
