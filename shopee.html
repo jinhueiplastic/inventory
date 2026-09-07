@@ -215,7 +215,7 @@
         try {
             // ── 第一步：先拉文字資料（不含圖片），快速顯示 ──
             const data = await sbFetch(
-                "shopee_orders?select=sheet_row,order_id,buyer,date,name,qty,sold_out,shipped,shipped_at&order=date.desc&_=" + Date.now()
+                "shopee_orders?select=sheet_row,order_id,buyer,date,name,qty,sold_out,shipped,shipped_at&order=date.desc"
             );
             allOrders = data.map(r => ({
                 row      : r.sheet_row,
@@ -256,7 +256,7 @@
 
             // ── 第二步：背景載入圖片，載完後更新畫面 ──
             const imgData = await sbFetch(
-                "shopee_orders?select=sheet_row,img_url&img_url=neq.%22%22&order=date.desc&_=" + Date.now()
+                "shopee_orders?select=sheet_row,img_url&img_url=neq.&order=date.desc"
             );
             // 建立 row→imgUrl 的 map
             const imgMap = {};
