@@ -2,6 +2,9 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>錦輝塑膠 - 蝦皮訂單管理</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -204,20 +207,22 @@
 
     window.addEventListener('DOMContentLoaded', loadOrders);
 
-    // ── 載入訂單：Supabase（蝦皮）+ GAS JSONP（賣貨便）──
+    // ── 載入訂單：文字先顯示，圖片背景載入 ──
     async function loadOrders() {
         const ls = document.getElementById('loading-screen');
         if (ls) { ls.style.display = 'flex'; document.getElementById('loading-msg').textContent = '正在載入訂單資料...'; }
         updateStatus("connecting", "正在載入訂單...");
         try {
-            // 蝦皮：從 Supabase
-            const data = await sbFetch("shopee_orders?select=*&order=date.desc");
+            // ── 第一步：先拉文字資料（不含圖片），快速顯示 ──
+            const data = await sbFetch(
+                "shopee_orders?select=sheet_row,order_id,buyer,date,name,qty,sold_out,shipped,shipped_at&order=date.desc&_=" + Date.now()
+            );
             allOrders = data.map(r => ({
                 row      : r.sheet_row,
                 orderId  : r.order_id,
                 buyer    : r.buyer,
                 date     : r.date,
-                imgUrl   : r.img_url,
+                imgUrl   : '',   // 先空白，圖片背景載入
                 name     : r.name,
                 qty      : r.qty,
                 shipped  : r.shipped,
@@ -227,8 +232,8 @@
             }));
             selectedRows.clear();
 
-            // 賣貨便：從 GAS JSONP
-            await new Promise((resolve) => {
+            // 賣貨便：從 GAS JSONP（同步進行）
+            const maihuoPromise = new Promise((resolve) => {
                 window._maihuoCb = function(data) {
                     document.getElementById('jsonp-maihuo')?.remove();
                     if (!data.error) {
@@ -244,9 +249,30 @@
                 document.body.appendChild(s);
             });
 
+            // 先渲染文字（無圖片），立即顯示給用戶
             renderAll();
             hideLoading();
             updateStatus("success", `已載入 ${allOrders.length} 筆蝦皮 + ${maihuoOrders.length} 筆賣貨便`);
+
+            // ── 第二步：背景載入圖片，載完後更新畫面 ──
+            const imgData = await sbFetch(
+                "shopee_orders?select=sheet_row,img_url&img_url=neq.&order=date.desc&_=" + Date.now()
+            );
+            // 建立 row→imgUrl 的 map
+            const imgMap = {};
+            imgData.forEach(r => { if (r.img_url) imgMap[r.sheet_row] = r.img_url; });
+            // 更新 allOrders 的 imgUrl
+            let imgUpdated = false;
+            allOrders = allOrders.map(o => {
+                const img = imgMap[o.row];
+                if (img && img !== o.imgUrl) { imgUpdated = true; return { ...o, imgUrl: img }; }
+                return o;
+            });
+            if (imgUpdated) renderAll();  // 有圖片就重新渲染
+
+            // 等賣貨便也載完
+            await maihuoPromise;
+
         } catch(err) {
             hideLoading();
             updateStatus("error", "載入失敗：" + err.message);
