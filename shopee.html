@@ -256,7 +256,7 @@
 
             // ── 第二步：背景載入圖片，載完後更新畫面 ──
             const imgData = await sbFetch(
-                "shopee_orders?select=sheet_row,img_url&img_url=neq.&order=date.desc&_=" + Date.now()
+                "shopee_orders?select=sheet_row,img_url&img_url=neq.%22%22&order=date.desc&_=" + Date.now()
             );
             // 建立 row→imgUrl 的 map
             const imgMap = {};
